@@ -2,6 +2,18 @@
 
 All notable changes to the Budget App project.
 
+## [0.2.1] - 2026-01-12
+
+### Documentation
+- **Hierarchical CLAUDE.md Documentation**
+  - Root CLAUDE.md with full project overview, architecture, and documentation map
+  - Backend documentation tree (backend/, app/, models/, schemas/, routers/, services/, utils/)
+  - Frontend documentation tree (frontend/, src/, lib/, api/, stores/, routes/)
+  - Situational awareness links (Location, Parent, Children, Siblings) in all files
+  - 14 CLAUDE.md files covering every module and subdirectory
+
+---
+
 ## [0.2.0] - 2026-01-12
 
 ### Added
