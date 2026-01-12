@@ -1,101 +1,174 @@
 # Frontend Source - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/src/`
+> **Parent:** [`frontend/`](../CLAUDE.md)
+> **Children:** [`lib/`](lib/CLAUDE.md), [`routes/`](routes/CLAUDE.md)
 
-Main source directory containing all application code: library modules, routes/pages, and the HTML template.
+## Purpose
 
-## Structure
+Main source directory for the SvelteKit application. Contains all application code including library modules, routes/pages, and the HTML template.
+
+---
+
+## Directory Structure
 
 ```
 src/
-├── lib/                   # Shared library code
-│   ├── api/              # API client and types
-│   ├── stores/           # Reactive state stores
-│   ├── components/       # Reusable components
-│   └── assets/           # Static assets
-├── routes/               # SvelteKit pages
-│   ├── +layout.svelte    # Root layout
-│   ├── +page.svelte      # Dashboard (/)
-│   ├── login/            # Authentication
-│   ├── transactions/     # Transaction management
-│   ├── budgets/          # Budget tracking
-│   ├── recurring/        # Recurring transactions
-│   ├── goals/            # Savings goals
-│   ├── banking/          # Open Banking
-│   ├── reports/          # Analytics
-│   └── settings/         # Settings & import
-└── app.html              # HTML shell template
+├── lib/                    # Shared library code ($lib alias)
+│   ├── api/               # REST API client & types
+│   │   ├── client.ts      # API methods (38 total)
+│   │   └── types.ts       # TypeScript interfaces
+│   ├── stores/            # Svelte reactive stores
+│   │   ├── auth.ts        # Authentication state
+│   │   └── categories.ts  # Category list
+│   ├── components/        # Reusable UI (empty)
+│   └── assets/            # Static assets
+├── routes/                # SvelteKit pages (10 pages)
+│   ├── +layout.svelte     # Root layout (sidebar)
+│   ├── +page.svelte       # Dashboard (/)
+│   ├── login/             # Authentication
+│   ├── transactions/      # Transaction CRUD
+│   ├── budgets/           # Monthly budgets
+│   ├── recurring/         # Recurring transactions
+│   ├── goals/             # Savings goals
+│   ├── banking/           # Open Banking
+│   ├── reports/           # Analytics
+│   └── settings/          # Configuration
+└── app.html               # HTML shell template
 ```
 
-## Import Aliases
+---
 
-SvelteKit provides the `$lib` alias for imports from the `lib/` directory:
+## Key Files
 
+### app.html
+HTML template with SvelteKit placeholders:
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    %sveltekit.head%
+  </head>
+  <body>
+    <div>%sveltekit.body%</div>
+  </body>
+</html>
+```
+
+### lib/
+Shared code accessible via `$lib` alias:
+- API client with 38 endpoint methods
+- TypeScript types for all data models
+- Authentication and categories stores
+
+### routes/
+File-based routing:
+- Each `+page.svelte` defines a page
+- `+layout.svelte` provides shared UI
+- Nested directories create nested routes
+
+---
+
+## Import Patterns
+
+### $lib Alias
 ```typescript
-// Instead of: import { api } from '../../../lib/api/client'
 import { api } from '$lib/api/client';
 import { auth } from '$lib/stores/auth';
 import type { Transaction } from '$lib/api/types';
 ```
 
-## Key Files
+### Inter-route Navigation
+```typescript
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
 
-### app.html
-HTML template with placeholders:
-- `%sveltekit.head%` - Injected head content
-- `%sveltekit.body%` - Rendered page content
+// Navigate programmatically
+goto('/login');
 
-### +layout.svelte
-Root layout component:
-- Sidebar navigation with 8 links
-- Auth state subscription
-- Route protection (redirects to /login)
-- Logout functionality
+// Access current route
+$page.url.pathname
+```
 
-### +page.svelte (Dashboard)
-Home page showing:
-- Monthly summary (income, expenses, net)
-- Budget status with progress bars
-- Savings goals progress
+---
 
-## Svelte 5 Runes
+## Svelte 5 Features Used
 
-The app uses Svelte 5's new runes syntax:
-
+### Reactive State ($state)
 ```svelte
 <script lang="ts">
-  // Reactive state
-  let count = $state(0);
-
-  // Derived values
-  let doubled = $derived(count * 2);
-
-  // Side effects
-  $effect(() => {
-    console.log('Count changed:', count);
-  });
-
-  // Props
-  let { name } = $props<{ name: string }>();
+  let transactions = $state<Transaction[]>([]);
+  let loading = $state(true);
 </script>
 ```
 
-## Data Flow
+### Derived Values ($derived)
+```svelte
+<script lang="ts">
+  let filtered = $derived(
+    transactions.filter(t => t.type === filterType)
+  );
+</script>
+```
+
+### Side Effects ($effect)
+```svelte
+<script lang="ts">
+  $effect(() => {
+    loadData();
+  });
+</script>
+```
+
+### Props ($props)
+```svelte
+<script lang="ts">
+  let { children } = $props();
+</script>
+```
+
+---
+
+## Application Flow
 
 ```
-User Action
-    → Event Handler
-    → API Client Call
-    → Backend Response
-    → State Update ($state)
-    → Reactive UI Update
+app.html (shell)
+    ↓
++layout.svelte (auth check, sidebar)
+    ↓
++page.svelte (route content)
+    ↓
+$lib/api (data fetching)
+    ↓
+$lib/stores (state management)
+    ↓
+Reactive UI updates
 ```
+
+---
 
 ## Authentication Flow
 
-1. App loads → `auth.checkStatus()` called
-2. If not authenticated → redirect to `/login`
-3. User enters PIN → `auth.login(pin)` or `auth.setup(pin)`
-4. Token stored in localStorage
-5. Subsequent API calls include `Authorization: Bearer {token}`
-6. Logout clears token and redirects to `/login`
+1. **App loads** → `+layout.svelte` calls `auth.checkStatus()`
+2. **Not authenticated** → Redirect to `/login`
+3. **Login page** → User enters PIN
+4. **Auth success** → Token stored, redirect to dashboard
+5. **Authenticated requests** → JWT in Authorization header
+6. **Logout** → Clear token, redirect to `/login`
+
+---
+
+## Page Summary
+
+| Page | Features | Main Components |
+|------|----------|-----------------|
+| Dashboard | Summary cards, budget/goal progress | Cards, progress bars |
+| Transactions | CRUD, filtering | List, modal form |
+| Budgets | Month selector, progress tracking | Grid, progress bars |
+| Recurring | Frequency options, process button | List, toggle, form |
+| Goals | Contributions, progress | Grid, contribution modal |
+| Banking | Bank sync, pending review | Account cards, pending list |
+| Reports | Chart.js graphs | Bar chart, doughnut chart |
+| Settings | PIN change, categories, CSV | Forms, file upload |

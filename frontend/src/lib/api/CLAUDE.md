@@ -1,106 +1,144 @@
-# API - CLAUDE.md
+# API Client - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/src/lib/api/`
+> **Parent:** [`frontend/src/lib/`](../CLAUDE.md)
+> **Siblings:** [`stores/`](../stores/CLAUDE.md)
 
-REST API client and TypeScript type definitions for communicating with the FastAPI backend.
+## Purpose
+
+REST API client and TypeScript type definitions for communicating with the FastAPI backend. Provides type-safe HTTP requests with automatic JWT token management.
+
+---
 
 ## Files
 
-### client.ts - API Client
+| File | Purpose |
+|------|---------|
+| `client.ts` | Singleton API client class (38 methods) |
+| `types.ts` | TypeScript interfaces (16 types) |
 
-Singleton class handling all backend communication.
+---
 
-**Configuration:**
-- Base URL: `http://localhost:8000/api`
-- Token Storage: localStorage (`budget_token`)
-- Auth Header: `Authorization: Bearer {token}`
+## client.ts - API Client
 
-**Token Management:**
+### Configuration
+
 ```typescript
-api.setToken(token: string)  // Store token
-api.clearToken()             // Remove token
-api.isAuthenticated()        // Check if token exists
+const BASE_URL = 'http://localhost:8000/api';
 ```
 
-**Authentication Endpoints:**
+Token stored in `localStorage` with key `'token'`.
+
+### Token Management
+
+| Method | Signature | Purpose |
+|--------|-----------|---------|
+| `setToken` | `(token: string) => void` | Store JWT in memory + localStorage |
+| `clearToken` | `() => void` | Remove token from memory + localStorage |
+| `isAuthenticated` | `() => boolean` | Check if token exists |
+
+### Core Request Handler
+
 ```typescript
-api.getAuthStatus()                        // GET /auth/status
-api.setupPin(pin: string)                  // POST /auth/setup
-api.login(pin: string)                     // POST /auth/login
-api.changePin(currentPin, newPin)          // POST /auth/change-pin
+private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T>
 ```
 
-**Transaction Endpoints:**
-```typescript
-api.getTransactions(filters?)              // GET /transactions
-api.createTransaction(data)                // POST /transactions
-api.updateTransaction(id, data)            // PUT /transactions/{id}
-api.deleteTransaction(id)                  // DELETE /transactions/{id}
-```
+- Adds `Content-Type: application/json`
+- Adds `Authorization: Bearer {token}` if authenticated
+- Throws `Error` with parsed detail on non-2xx responses
+- Returns `undefined` for 204 No Content
 
-**Category Endpoints:**
-```typescript
-api.getCategories()                        // GET /categories
-api.createCategory(data)                   // POST /categories
-api.deleteCategory(id)                     // DELETE /categories/{id}
-```
+### Authentication Endpoints (4)
 
-**Budget Endpoints:**
-```typescript
-api.getBudgets(month)                      // GET /budgets?month=YYYY-MM
-api.createBudget(data)                     // POST /budgets
-api.getBudgetStatus(month)                 // GET /budgets/status?month=YYYY-MM
-api.deleteBudget(id)                       // DELETE /budgets/{id}
-```
+| Method | HTTP | Path | Request | Response |
+|--------|------|------|---------|----------|
+| `getAuthStatus()` | GET | `/auth/status` | - | `AuthStatus` |
+| `setupPin(pin)` | POST | `/auth/setup` | `{pin}` | `Token` |
+| `login(pin)` | POST | `/auth/login` | `{pin}` | `Token` |
+| `changePin(currentPin, newPin)` | POST | `/auth/change-pin` | `{current_pin, new_pin}` | void |
 
-**Recurring Transaction Endpoints:**
-```typescript
-api.getRecurringTransactions()             // GET /recurring
-api.createRecurringTransaction(data)       // POST /recurring
-api.updateRecurringTransaction(id, data)   // PUT /recurring/{id}
-api.deleteRecurringTransaction(id)         // DELETE /recurring/{id}
-api.processRecurringTransactions()         // POST /recurring/process
-```
+### Transaction Endpoints (4)
 
-**Goal Endpoints:**
-```typescript
-api.getGoals()                             // GET /goals
-api.createGoal(data)                       // POST /goals
-api.updateGoal(id, data)                   // PUT /goals/{id}
-api.contributeToGoal(id, amount)           // POST /goals/{id}/contribute
-api.deleteGoal(id)                         // DELETE /goals/{id}
-```
+| Method | HTTP | Path | Parameters | Response |
+|--------|------|------|------------|----------|
+| `getTransactions(params?)` | GET | `/transactions` | `start_date?, end_date?, category_id?, type?` | `Transaction[]` |
+| `createTransaction(data)` | POST | `/transactions` | `TransactionCreate` | `Transaction` |
+| `updateTransaction(id, data)` | PUT | `/transactions/{id}` | `Partial<TransactionCreate>` | `Transaction` |
+| `deleteTransaction(id)` | DELETE | `/transactions/{id}` | - | void |
 
-**Report Endpoints:**
-```typescript
-api.getMonthlySummary(month)               // GET /reports/monthly-summary
-api.getCategoryBreakdown(month)            // GET /reports/category-breakdown
-api.getTrends(months)                      // GET /reports/trends?months=N
-```
+### Category Endpoints (3)
 
-**Import Endpoints:**
-```typescript
-api.uploadCSV(file: File)                  // POST /import/csv
-api.confirmImport(rows)                    // POST /import/confirm
-```
+| Method | HTTP | Path | Response |
+|--------|------|------|----------|
+| `getCategories()` | GET | `/categories` | `Category[]` |
+| `createCategory(data)` | POST | `/categories` | `Category` |
+| `deleteCategory(id)` | DELETE | `/categories/{id}` | void |
 
-**Banking Endpoints:**
-```typescript
-api.getAvailableBanks()                    // GET /banking/banks
-api.getBankConnections()                   // GET /banking/connections
-api.createBankConnection(data)             // POST /banking/connections
-api.deleteBankConnection(id)               // DELETE /banking/connections/{id}
-api.syncBankConnection(id)                 // POST /banking/connections/{id}/sync
-api.getPendingTransactions()               // GET /banking/pending
-api.importPendingTransaction(id, catId)    // POST /banking/pending/{id}/import
-api.dismissPendingTransaction(id)          // POST /banking/pending/{id}/dismiss
-api.importAllPending()                     // POST /banking/pending/import-all
-api.getBankBalances()                      // GET /banking/balances
-```
+### Budget Endpoints (4)
 
-### types.ts - TypeScript Interfaces
+| Method | HTTP | Path | Parameters | Response |
+|--------|------|------|------------|----------|
+| `getBudgets(month)` | GET | `/budgets?month=` | `YYYY-MM` | `Budget[]` |
+| `createBudget(data)` | POST | `/budgets` | `{category_id, amount, month}` | `Budget` |
+| `getBudgetStatus(month)` | GET | `/budgets/status?month=` | `YYYY-MM` | `BudgetStatus[]` |
+| `deleteBudget(id)` | DELETE | `/budgets/{id}` | - | void |
 
-**Core Types:**
+### Recurring Transaction Endpoints (5)
+
+| Method | HTTP | Path | Response |
+|--------|------|------|----------|
+| `getRecurring()` | GET | `/recurring` | `RecurringTransaction[]` |
+| `createRecurring(data)` | POST | `/recurring` | `RecurringTransaction` |
+| `updateRecurring(id, data)` | PUT | `/recurring/{id}` | `RecurringTransaction` |
+| `deleteRecurring(id)` | DELETE | `/recurring/{id}` | void |
+| `processRecurring()` | POST | `/recurring/process` | `{processed: number}` |
+
+### Goal Endpoints (5)
+
+| Method | HTTP | Path | Response |
+|--------|------|------|----------|
+| `getGoals()` | GET | `/goals` | `Goal[]` |
+| `createGoal(data)` | POST | `/goals` | `Goal` |
+| `updateGoal(id, data)` | PUT | `/goals/{id}` | `Goal` |
+| `contributeToGoal(id, amount)` | POST | `/goals/{id}/contribute` | `Goal` |
+| `deleteGoal(id)` | DELETE | `/goals/{id}` | void |
+
+### Report Endpoints (3)
+
+| Method | HTTP | Path | Response |
+|--------|------|------|----------|
+| `getMonthlySummary(month)` | GET | `/reports/monthly-summary?month=` | `MonthlySummary` |
+| `getCategoryBreakdown(month)` | GET | `/reports/category-breakdown?month=` | `CategoryBreakdown[]` |
+| `getTrends(months?)` | GET | `/reports/trends?months=` | `MonthlySummary[]` |
+
+### Import Endpoints (2)
+
+| Method | HTTP | Path | Note |
+|--------|------|------|------|
+| `uploadCSV(file)` | POST | `/import/csv` | Uses FormData |
+| `confirmImport(rows)` | POST | `/import/confirm` | JSON body |
+
+### Banking Endpoints (10)
+
+| Method | HTTP | Path | Response |
+|--------|------|------|----------|
+| `getAvailableBanks()` | GET | `/banking/banks` | `BankInfo[]` |
+| `getBankConnections()` | GET | `/banking/connections` | `BankConnection[]` |
+| `createBankConnection(data)` | POST | `/banking/connections` | `BankConnection` |
+| `deleteBankConnection(id)` | DELETE | `/banking/connections/{id}` | void |
+| `syncBankConnection(id)` | POST | `/banking/connections/{id}/sync` | `{synced, balance}` |
+| `getPendingTransactions()` | GET | `/banking/pending` | `PendingTransaction[]` |
+| `importPendingTransaction(id, categoryId)` | POST | `/banking/pending/{id}/import` | `{message, transaction_id}` |
+| `dismissPendingTransaction(id)` | POST | `/banking/pending/{id}/dismiss` | void |
+| `importAllPending()` | POST | `/banking/pending/import-all` | `{imported}` |
+| `getBankBalances()` | GET | `/banking/balances` | `BankBalance[]` |
+
+---
+
+## types.ts - TypeScript Interfaces
+
+### Core Types
+
 ```typescript
 interface Category {
   id: number;
@@ -109,6 +147,7 @@ interface Category {
   is_default: boolean;
   icon: string | null;
   color: string | null;
+  created_at: string;
 }
 
 interface Transaction {
@@ -116,17 +155,19 @@ interface Transaction {
   amount: number;
   type: 'income' | 'expense';
   category_id: number;
-  category: Category;
   description: string | null;
   date: string;
+  created_at: string;
+  category: Category;  // Nested
 }
 
 interface Budget {
   id: number;
   category_id: number;
-  category: Category;
   amount: number;
-  month: string;
+  month: string;  // YYYY-MM
+  created_at: string;
+  category: Category;  // Nested
 }
 
 interface BudgetStatus {
@@ -143,11 +184,12 @@ interface RecurringTransaction {
   amount: number;
   type: 'income' | 'expense';
   category_id: number;
-  category: Category;
   description: string | null;
   frequency: 'daily' | 'weekly' | 'monthly';
   next_run_date: string;
   is_active: boolean;
+  created_at: string;
+  category: Category;  // Nested
 }
 
 interface Goal {
@@ -156,8 +198,18 @@ interface Goal {
   target_amount: number;
   current_amount: number;
   deadline: string;
-  progress_percentage: number;
-  days_remaining: number;
+  created_at: string;
+  progress_percentage: number;  // Computed
+  days_remaining: number;       // Computed
+}
+```
+
+### Banking Types
+
+```typescript
+interface BankInfo {
+  name: string;
+  accounts: string[];
 }
 
 interface BankConnection {
@@ -168,6 +220,7 @@ interface BankConnection {
   balance: number;
   last_synced: string | null;
   is_active: boolean;
+  created_at: string;
 }
 
 interface PendingTransaction {
@@ -178,23 +231,27 @@ interface PendingTransaction {
   merchant_name: string;
   date: string;
   suggested_category_id: number | null;
-  suggested_category: Category | null;
-  status: 'pending' | 'imported' | 'dismissed';
+  suggested_category: Category | null;  // Nested optional
+  status: string;
+  created_at: string;
 }
 ```
 
-## Error Handling
-
-The client parses JSON error responses:
+### Auth Types
 
 ```typescript
-try {
-  await api.createTransaction(data);
-} catch (error) {
-  // error.message contains backend error detail
-  console.error(error.message);
+interface AuthStatus {
+  currency: string;
+  is_setup: boolean;
+}
+
+interface Token {
+  access_token: string;
+  token_type: string;
 }
 ```
+
+---
 
 ## Usage Example
 
@@ -205,10 +262,23 @@ import type { Transaction } from '$lib/api/types';
 // In a Svelte component
 let transactions: Transaction[] = $state([]);
 
-async function loadTransactions() {
+async function loadData() {
   transactions = await api.getTransactions({
     start_date: '2026-01-01',
     type: 'expense'
   });
+}
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  await api.createTransaction(data);
+} catch (error) {
+  // error.message contains backend error detail
+  console.error(error.message);
 }
 ```

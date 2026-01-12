@@ -1,78 +1,151 @@
 # Lib - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/src/lib/`
+> **Parent:** [`frontend/src/`](../CLAUDE.md)
+> **Children:** [`api/`](api/CLAUDE.md), [`stores/`](stores/CLAUDE.md)
+> **Siblings:** [`routes/`](../routes/CLAUDE.md) (at src level)
 
-Shared library code accessible via the `$lib` import alias. Contains API client, TypeScript types, reactive stores, and reusable components.
+## Purpose
 
-## Subdirectories
+Shared library code accessible via the `$lib` import alias. Contains API client, TypeScript types, and reactive stores for global state management.
+
+---
+
+## Directory Structure
+
+```
+lib/
+├── api/
+│   ├── client.ts      # REST API client (38 methods)
+│   └── types.ts       # TypeScript interfaces (16 types)
+├── stores/
+│   ├── auth.ts        # Authentication store (4 methods)
+│   └── categories.ts  # Categories store (3 methods)
+├── components/        # Empty (UI components inline in routes)
+├── assets/
+│   └── favicon.svg    # App favicon
+└── index.ts           # Empty placeholder
+```
+
+---
+
+## Submodules
 
 ### api/
-API communication layer:
-- `client.ts` - REST API client class with all endpoints
-- `types.ts` - TypeScript interfaces for API data
+REST API communication layer:
+- **client.ts** - Singleton `ApiClient` class with all backend endpoints
+- **types.ts** - TypeScript interfaces matching Pydantic schemas
 
 ### stores/
-Svelte reactive stores for global state:
-- `auth.ts` - Authentication state and methods
-- `categories.ts` - Category list with CRUD operations
+Svelte reactive stores:
+- **auth.ts** - Authentication state (isAuthenticated, isSetup, loading)
+- **categories.ts** - Category list with CRUD operations
 
 ### components/
-Reusable UI components (minimal currently - most UI is in routes)
+Currently empty. UI components are defined directly in route files.
 
 ### assets/
-Static assets like images and icons
+Static assets (favicon only currently).
 
-## Import Usage
+---
+
+## Import Alias
+
+SvelteKit provides the `$lib` alias:
 
 ```typescript
-// API client
+// Instead of relative paths
+import { api } from '../../../lib/api/client';
+
+// Use $lib alias
+import { api } from '$lib/api/client';
+import { auth } from '$lib/stores/auth';
+import type { Transaction } from '$lib/api/types';
+```
+
+---
+
+## Key Exports
+
+### API Client
+```typescript
 import { api } from '$lib/api/client';
 
-// Types
-import type { Transaction, Category, Budget } from '$lib/api/types';
+// All endpoints available
+await api.getTransactions({ type: 'expense' });
+await api.createBudget({ category_id: 1, amount: 500, month: '2026-01' });
+await api.syncBankConnection(connectionId);
+```
 
-// Stores
+### Stores
+```typescript
 import { auth } from '$lib/stores/auth';
 import { categories } from '$lib/stores/categories';
-```
 
-## API Client Pattern
-
-The API client is a singleton class that handles:
-- Base URL configuration
-- JWT token management (localStorage)
-- Request/response handling
-- Error parsing
-
-```typescript
-// Example usage in a component
-const transactions = await api.getTransactions({
-  start_date: '2026-01-01',
-  end_date: '2026-01-31',
-  type: 'expense'
-});
-```
-
-## Store Pattern
-
-Stores use Svelte's `writable` for reactive state:
-
-```typescript
-// In a component
-import { auth } from '$lib/stores/auth';
-
-// Subscribe to changes
+// Subscribe to state
 $: isLoggedIn = $auth.isAuthenticated;
 
-// Call store methods
+// Call methods
 await auth.login(pin);
-await auth.logout();
+await categories.load();
 ```
 
-## Best Practices
+### Types
+```typescript
+import type {
+  Transaction,
+  Category,
+  Budget,
+  BudgetStatus,
+  Goal,
+  BankConnection,
+  PendingTransaction
+} from '$lib/api/types';
+```
 
-1. **Type Safety**: All API responses are typed
-2. **Error Handling**: API client throws on errors
-3. **Token Management**: Automatic Bearer token inclusion
-4. **Store Updates**: Methods update store state after API calls
-5. **Reactivity**: Use `$` prefix for store subscriptions
+---
+
+## Data Flow
+
+```
+User Action (UI)
+    ↓
+Store Method / Direct API Call
+    ↓
+api/client.ts (fetch with JWT)
+    ↓
+Backend Response
+    ↓
+Store Update (if applicable)
+    ↓
+Reactive UI Update ($state / $)
+```
+
+---
+
+## Dependencies
+
+```
+api/client.ts
+    └── fetch (native)
+    └── localStorage (token storage)
+
+stores/auth.ts
+    └── api/client.ts
+    └── svelte/store
+
+stores/categories.ts
+    └── api/client.ts
+    └── svelte/store
+```
+
+---
+
+## Usage Across Routes
+
+| Module | Used By |
+|--------|---------|
+| `api` | All route pages |
+| `auth` store | `+layout.svelte`, `login/+page.svelte` |
+| `categories` store | transactions, budgets, recurring, banking, settings pages |
+| Types | All pages with TypeScript |

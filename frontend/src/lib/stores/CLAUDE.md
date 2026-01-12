@@ -1,57 +1,94 @@
 # Stores - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/src/lib/stores/`
+> **Parent:** [`frontend/src/lib/`](../CLAUDE.md)
+> **Siblings:** [`api/`](../api/CLAUDE.md)
+
+## Purpose
 
 Svelte reactive stores for managing global application state. Uses Svelte's `writable` store primitive for reactive updates across components.
 
+---
+
 ## Files
 
-### auth.ts - Authentication Store
+| File | Store | Purpose |
+|------|-------|---------|
+| `auth.ts` | `auth` | Authentication state and methods |
+| `categories.ts` | `categories` | Category list with CRUD operations |
 
-Manages authentication state and provides login/logout methods.
+---
 
-**State:**
+## auth.ts - Authentication Store
+
+### State Interface
+
 ```typescript
 interface AuthState {
-  isAuthenticated: boolean;  // User has valid token
+  isAuthenticated: boolean;  // Has valid JWT token
   isSetup: boolean;          // PIN has been configured
   loading: boolean;          // Checking auth status
 }
+
+// Initial state
+{
+  isAuthenticated: false,
+  isSetup: false,
+  loading: true
+}
 ```
 
-**Methods:**
+### Methods
 
-`checkStatus()`
-- Called on app initialization
-- Checks `/api/auth/status` endpoint
-- Sets `isSetup` based on response
-- Validates existing token if present
-- Updates `isAuthenticated` accordingly
+#### `checkStatus(): Promise<void>`
+Called on app initialization to verify authentication.
 
-`setup(pin: string)`
-- Creates new PIN via `/api/auth/setup`
-- Stores returned JWT token
-- Sets `isAuthenticated = true`
+```typescript
+// Logic:
+1. Set loading = true
+2. Call api.getAuthStatus()
+3. Check api.isAuthenticated() for token validity
+4. Update isAuthenticated and isSetup
+5. Set loading = false
+```
 
-`login(pin: string)`
-- Authenticates via `/api/auth/login`
-- Stores returned JWT token
-- Sets `isAuthenticated = true`
+#### `setup(pin: string): Promise<void>`
+Creates initial PIN for new users.
 
-`logout()`
-- Clears token from localStorage
-- Sets `isAuthenticated = false`
-- Does NOT reset `isSetup`
+```typescript
+// Logic:
+1. Call api.setupPin(pin)
+2. Token automatically stored by API client
+3. Set isAuthenticated = true, isSetup = true
+```
 
-**Usage:**
+#### `login(pin: string): Promise<void>`
+Authenticates with existing PIN.
+
+```typescript
+// Logic:
+1. Call api.login(pin)
+2. Token automatically stored by API client
+3. Set isAuthenticated = true
+```
+
+#### `logout(): void`
+Clears authentication state.
+
+```typescript
+// Logic:
+1. Call api.clearToken()
+2. Set isAuthenticated = false
+3. Keep isSetup = true (PIN still exists)
+```
+
+### Usage
+
 ```svelte
 <script lang="ts">
   import { auth } from '$lib/stores/auth';
 
-  // Subscribe to state changes
-  let authState = $state($auth);
-
-  // Or use $ prefix in template
+  // Auto-subscription with $ prefix
 </script>
 
 {#if $auth.loading}
@@ -63,40 +100,66 @@ interface AuthState {
 {/if}
 ```
 
-### categories.ts - Categories Store
+---
 
-Manages the list of transaction categories.
+## categories.ts - Categories Store
 
-**State:**
+### State
+
 ```typescript
 type CategoriesState = Category[];
+
+// Initial state: empty array
+[]
 ```
 
-**Methods:**
+### Methods
 
-`load()`
-- Fetches all categories from `/api/categories`
-- Updates store with response array
-- Called on app initialization and after mutations
+#### `load(): Promise<void>`
+Fetches all categories from API.
 
-`create(data: CategoryCreate)`
-- Creates new category via `/api/categories`
-- Calls `load()` to refresh list
+```typescript
+// Logic:
+1. Call api.getCategories()
+2. Set store to returned array
+```
 
-`delete(id: number)`
-- Deletes category via `/api/categories/{id}`
-- Calls `load()` to refresh list
-- Note: Default categories cannot be deleted
+#### `create(data: Partial<Category>): Promise<Category>`
+Creates a new custom category.
 
-**Usage:**
+```typescript
+// Logic:
+1. Call api.createCategory(data)
+2. Call this.load() to refresh
+3. Return created category
+
+// Required fields:
+- name: string
+- type: 'income' | 'expense'
+// Optional:
+- icon: string
+- color: string
+```
+
+#### `delete(id: number): Promise<void>`
+Deletes a custom category.
+
+```typescript
+// Logic:
+1. Call api.deleteCategory(id)
+2. Call this.load() to refresh
+
+// Note: Default categories (is_default=true) cannot be deleted
+```
+
+### Usage
+
 ```svelte
 <script lang="ts">
   import { categories } from '$lib/stores/categories';
   import { onMount } from 'svelte';
 
-  onMount(() => {
-    categories.load();
-  });
+  onMount(() => categories.load());
 </script>
 
 <select>
@@ -106,51 +169,55 @@ type CategoriesState = Category[];
 </select>
 ```
 
+---
+
 ## Store Pattern
 
-Both stores follow this pattern:
+Both stores follow this implementation pattern:
 
 ```typescript
 import { writable } from 'svelte/store';
 import { api } from '$lib/api/client';
 
-// Create writable store with initial state
-const { subscribe, set, update } = writable<State>(initialState);
+function createStore() {
+  const { subscribe, set, update } = writable<State>(initialState);
 
-// Export store with methods
-export const storeName = {
-  subscribe,  // Required for $ reactivity
+  return {
+    subscribe,  // Required for $ reactivity
 
-  async method() {
-    // Call API
-    const result = await api.endpoint();
-    // Update store
-    set(result);
-    // Or
-    update(state => ({ ...state, field: value }));
-  }
-};
+    async method() {
+      const result = await api.endpoint();
+      set(result);
+      // or
+      update(state => ({ ...state, field: value }));
+    }
+  };
+}
+
+export const storeName = createStore();
 ```
 
-## Reactivity
+---
 
-Stores integrate with Svelte's reactivity system:
+## Reactivity Integration
 
+### Method 1: Auto-subscription ($ prefix)
+```svelte
+{#if $auth.isAuthenticated}
+  <p>Logged in</p>
+{/if}
+```
+
+### Method 2: Reactive statement
 ```svelte
 <script>
-  import { auth } from '$lib/stores/auth';
-
-  // Method 1: $ prefix (auto-subscription)
   $: isLoggedIn = $auth.isAuthenticated;
+</script>
+```
 
-  // Method 2: Manual subscription
-  let authState;
-  const unsubscribe = auth.subscribe(value => {
-    authState = value;
-  });
-  onDestroy(unsubscribe);
-
-  // Method 3: Svelte 5 $state (in +layout.svelte)
+### Method 3: $effect (Svelte 5)
+```svelte
+<script>
   $effect(() => {
     const unsubscribe = auth.subscribe((state) => {
       if (!state.loading && !state.isAuthenticated) {
@@ -162,10 +229,23 @@ Stores integrate with Svelte's reactivity system:
 </script>
 ```
 
-## Best Practices
+---
 
-1. **Centralized State**: Use stores for data shared across multiple components
-2. **API Integration**: Store methods should call API and update state
-3. **Loading States**: Track loading status for async operations
-4. **Cleanup**: Unsubscribe in `onDestroy` when manually subscribing
-5. **Type Safety**: Use TypeScript interfaces for store state
+## Store Dependencies
+
+```
+auth.ts
+  └── api/client.ts (api.getAuthStatus, api.setupPin, api.login, api.clearToken)
+
+categories.ts
+  └── api/client.ts (api.getCategories, api.createCategory, api.deleteCategory)
+```
+
+---
+
+## Used By
+
+| Store | Components |
+|-------|------------|
+| `auth` | `+layout.svelte`, `login/+page.svelte` |
+| `categories` | `transactions/+page.svelte`, `budgets/+page.svelte`, `recurring/+page.svelte`, `banking/+page.svelte`, `settings/+page.svelte` |

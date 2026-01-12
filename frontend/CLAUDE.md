@@ -1,97 +1,208 @@
 # Frontend - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/`
+> **Parent:** [Project Root](../CLAUDE.md)
+> **Children:** [`src/`](src/CLAUDE.md)
+> **Siblings:** [`backend/`](../backend/CLAUDE.md)
 
-SvelteKit frontend for the Budget App. Provides a modern, responsive UI for personal finance management with transaction tracking, budget monitoring, savings goals, visual reports, and Open Banking integration.
+## Purpose
 
-## Tech Stack
+SvelteKit frontend for the Budget App. Provides a modern, reactive UI for personal finance management with transaction tracking, budget monitoring, savings goals, visual reports, and Open Banking integration.
 
-- **Framework**: SvelteKit 2.x (full-stack web framework)
-- **UI Library**: Svelte 5 (reactive components with runes)
-- **Language**: TypeScript (strict mode)
-- **Build Tool**: Vite 7.x
-- **Charts**: Chart.js 4.x
-- **Styling**: CSS (component-scoped)
+---
 
 ## Directory Structure
 
 ```
 frontend/
 ├── src/
-│   ├── lib/
-│   │   ├── api/           # API client and TypeScript types
-│   │   ├── stores/        # Svelte reactive stores
-│   │   ├── components/    # Reusable UI components
-│   │   └── assets/        # Static assets
-│   ├── routes/            # SvelteKit pages
-│   └── app.html           # HTML template
+│   ├── lib/                # Shared library ($lib)
+│   │   ├── api/           # REST client & types
+│   │   └── stores/        # Svelte stores
+│   └── routes/            # SvelteKit pages (10)
 ├── static/                # Public static files
-├── package.json           # Dependencies and scripts
-├── svelte.config.js       # SvelteKit configuration
-├── vite.config.ts         # Vite configuration
-└── tsconfig.json          # TypeScript configuration
+├── package.json           # Dependencies
+├── svelte.config.js       # SvelteKit config
+├── vite.config.ts         # Vite config
+└── tsconfig.json          # TypeScript config
 ```
 
-## Running the Frontend
+---
+
+## Tech Stack
+
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | SvelteKit | 2.x |
+| UI Library | Svelte | 5.x |
+| Language | TypeScript | 5.x |
+| Build Tool | Vite | 7.x |
+| Charts | Chart.js | 4.x |
+
+---
+
+## Quick Start
 
 ```bash
+# Navigate to frontend
+cd frontend
+
 # Install dependencies
 npm install
 
 # Run development server
 npm run dev
 
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Type checking
-npm run check
+# Open browser
+open http://localhost:5173
 ```
+
+---
 
 ## Available Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start dev server at http://localhost:5173 |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server (port 5173) |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview production build |
-| `npm run check` | Run svelte-check for type errors |
+| `npm run check` | TypeScript type checking |
 | `npm run check:watch` | Continuous type checking |
 
-## Key Features
+---
 
-- **9 Pages**: Dashboard, Transactions, Budgets, Recurring, Goals, Banking, Reports, Settings, Login
-- **Reactive State**: Svelte 5 runes ($state, $effect, $props)
-- **API Integration**: Full REST API client with JWT authentication
-- **Data Visualization**: Chart.js bar and doughnut charts
-- **Form Handling**: Modal-based forms with validation
-- **Route Protection**: Client-side auth guards
+## Pages (10)
+
+| Route | Page | Features |
+|-------|------|----------|
+| `/` | Dashboard | Summary cards, budget status, goal progress |
+| `/login` | Login | PIN setup/authentication |
+| `/transactions` | Transactions | CRUD, filtering, categories |
+| `/budgets` | Budgets | Monthly limits, progress bars |
+| `/recurring` | Recurring | Scheduled transactions |
+| `/goals` | Goals | Savings tracking, contributions |
+| `/banking` | Banking | Bank connections, pending imports |
+| `/reports` | Reports | Charts, analytics |
+| `/settings` | Settings | PIN, categories, CSV import |
+
+---
+
+## Key Components
+
+### Layout (`+layout.svelte`)
+- Sidebar navigation (220px fixed)
+- Authentication guard
+- Logout functionality
+
+### API Client (`$lib/api/client.ts`)
+- 38 endpoint methods
+- JWT token management
+- Automatic Authorization header
+
+### Stores (`$lib/stores/`)
+- `auth` - Authentication state
+- `categories` - Category list
+
+---
+
+## Svelte 5 Features
+
+```svelte
+<script lang="ts">
+  // Reactive state
+  let data = $state([]);
+
+  // Derived values
+  let filtered = $derived(data.filter(x => x.active));
+
+  // Side effects
+  $effect(() => {
+    fetchData();
+  });
+
+  // Props
+  let { value } = $props();
+</script>
+```
+
+---
+
+## Styling
+
+### Design System
+
+| Color | Usage | Hex |
+|-------|-------|-----|
+| Primary | Buttons, links | `#3498db` |
+| Success | Income, positive | `#2ecc71` |
+| Danger | Expense, negative | `#e74c3c` |
+| Warning | Budget warnings | `#f39c12` |
+| Sidebar | Navigation bg | `#2c3e50` |
+
+### Common Patterns
+- Cards: White background, 8px radius, subtle shadow
+- Progress bars: 8-10px height, colored fill
+- Modals: Fixed overlay, centered, z-index 100
+- Forms: Grid layouts, full-width inputs
+
+---
+
+## API Integration
+
+```typescript
+import { api } from '$lib/api/client';
+
+// In onMount or event handler
+const transactions = await api.getTransactions({
+  start_date: '2026-01-01',
+  type: 'expense'
+});
+
+await api.createTransaction({
+  amount: 50,
+  type: 'expense',
+  category_id: 1,
+  date: '2026-01-12'
+});
+```
+
+---
 
 ## Configuration
 
-### Environment
-- API Base URL: `http://localhost:8000/api` (hardcoded in client.ts)
-- Dev Server Port: 5173 (Vite default)
-
-### TypeScript
+### TypeScript (`tsconfig.json`)
 - Strict mode enabled
-- ES modules with bundler resolution
-- Source maps for debugging
+- ES modules
+- Source maps
 
-## Design System
+### Svelte (`svelte.config.js`)
+- `vitePreprocess()` for preprocessing
+- `@sveltejs/adapter-auto` for deployment
 
-### Colors
-- Primary: #3498db (blue)
-- Success/Income: #2ecc71 (green)
-- Danger/Expense: #e74c3c (red)
-- Warning: #f39c12 (orange)
-- Neutral: #ecf0f1, #999, #666
+### Vite (`vite.config.ts`)
+- SvelteKit plugin
+- Default port 5173
 
-### Layout
-- Sidebar navigation (220px fixed)
-- Main content area (flex: 1)
-- Card-based components
-- Modal dialogs for forms
+---
+
+## Chart.js Integration
+
+Used in Reports page:
+
+```typescript
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
+
+// Bar chart: Income vs Expenses (6 months)
+// Doughnut chart: Category breakdown
+```
+
+---
+
+## Related Documentation
+
+- [`src/`](src/CLAUDE.md) - Source directory overview
+- [`src/lib/`](src/lib/CLAUDE.md) - Shared library code
+- [`src/lib/api/`](src/lib/api/CLAUDE.md) - API client
+- [`src/lib/stores/`](src/lib/stores/CLAUDE.md) - Reactive stores
+- [`src/routes/`](src/routes/CLAUDE.md) - Pages and routing

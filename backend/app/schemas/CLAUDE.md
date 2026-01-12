@@ -1,93 +1,130 @@
 # Schemas - CLAUDE.md
 
-## Overview
+> **Location:** `backend/app/schemas/`
+> **Parent:** [`backend/app/`](../CLAUDE.md)
+> **Siblings:** [`models/`](../models/CLAUDE.md), [`routers/`](../routers/CLAUDE.md), [`services/`](../services/CLAUDE.md), [`utils/`](../utils/CLAUDE.md)
 
-Pydantic schemas for request/response validation and serialization. Each schema file corresponds to a model and defines Create, Update, and Response schemas.
+## Purpose
+
+Pydantic schemas for request/response validation and serialization. Provides type-safe API contracts between frontend and backend.
 
 ## Schema Pattern
 
-Each domain follows a consistent pattern:
-
 ```python
-# Base schema with shared fields
+# Base: Common fields
 class ItemBase(BaseModel):
     name: str
     value: float
 
-# Create schema (request body for POST)
+# Create: For POST requests (extends Base)
 class ItemCreate(ItemBase):
     pass
 
-# Update schema (request body for PUT/PATCH - optional fields)
+# Update: For PUT/PATCH (all fields optional)
 class ItemUpdate(BaseModel):
     name: str | None = None
     value: float | None = None
 
-# Response schema (API response with ID and timestamps)
+# Response: API output (extends Base + adds id, timestamps)
 class ItemResponse(ItemBase):
     id: int
     created_at: datetime
 
     class Config:
-        from_attributes = True  # Enable ORM mode
+        from_attributes = True  # ORM mode
 ```
 
-## Schema Files
+## Files & Classes
 
-### user.py
-- `PinSetup`: PIN string for initial setup
-- `PinLogin`: PIN string for authentication
-- `PinChange`: Current PIN + new PIN for changing
-- `Token`: JWT access token response
-- `UserSettingsResponse`: Currency and setup status
+### `user.py` - Authentication (5 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `PinSetup` | `pin: str` | Initial PIN setup request |
+| `PinLogin` | `pin: str` | Login request |
+| `PinChange` | `current_pin, new_pin: str` | Change PIN request |
+| `Token` | `access_token, token_type: str` | JWT response |
+| `UserSettingsResponse` | `currency, is_setup: bool` | Auth status |
 
-### category.py
-- `CategoryCreate`: name, type, icon, color
-- `CategoryUpdate`: All fields optional
-- `CategoryResponse`: Includes id, is_default, created_at
+### `category.py` - Categories (4 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `CategoryBase` | `name, type, icon?, color?` | Shared fields |
+| `CategoryCreate` | *(extends Base)* | Create request |
+| `CategoryUpdate` | `name?, icon?, color?` | Update (no type change) |
+| `CategoryResponse` | `+ id, is_default, created_at` | Full response |
 
-### transaction.py
-- `TransactionCreate`: amount, type, category_id, description, date
-- `TransactionUpdate`: All fields optional
-- `TransactionResponse`: Includes nested `CategoryResponse`
+### `transaction.py` - Transactions (4 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `TransactionBase` | `amount, type, category_id, description?, date` | Shared fields |
+| `TransactionCreate` | *(extends Base)* | Create request |
+| `TransactionUpdate` | All optional | Partial update |
+| `TransactionResponse` | `+ id, created_at, category: CategoryResponse` | Nested response |
 
-### budget.py
-- `BudgetCreate`: category_id, amount, month (YYYY-MM)
-- `BudgetUpdate`: Only amount updatable
-- `BudgetResponse`: Includes nested `CategoryResponse`
-- `BudgetStatus`: Computed fields (spent, remaining, percentage_used)
+### `budget.py` - Budgets (4 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `BudgetBase` | `category_id, amount, month` | Shared fields |
+| `BudgetCreate` | *(extends Base)* | Create request |
+| `BudgetUpdate` | `amount: float` | Only amount updatable |
+| `BudgetResponse` | `+ id, created_at, category: CategoryResponse` | Nested response |
+| `BudgetStatus` | `category_id, category_name, budgeted, spent, remaining, percentage_used` | Computed report |
 
-### recurring.py
-- `RecurringCreate`: amount, type, category_id, description, frequency, next_run_date
-- `RecurringUpdate`: All fields optional + is_active
-- `RecurringResponse`: Includes nested `CategoryResponse`
+### `recurring.py` - Recurring Transactions (4 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `RecurringBase` | `amount, type, category_id, description?, frequency, next_run_date` | Shared fields |
+| `RecurringCreate` | *(extends Base)* | Create request |
+| `RecurringUpdate` | All optional + `is_active?` | Update with toggle |
+| `RecurringResponse` | `+ id, is_active, created_at, category: CategoryResponse` | Nested response |
 
-### goal.py
-- `GoalCreate`: name, target_amount, deadline
-- `GoalUpdate`: All fields optional
-- `GoalContribute`: amount for contribution
-- `GoalResponse`: Includes computed `progress_percentage`, `days_remaining`
+### `goal.py` - Savings Goals (4 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `GoalBase` | `name, target_amount, deadline` | Shared fields |
+| `GoalCreate` | *(extends Base)* | Create request |
+| `GoalUpdate` | All optional + `current_amount?` | Update fields |
+| `GoalContribute` | `amount: float` | Contribution action |
+| `GoalResponse` | `+ id, current_amount, created_at, progress_percentage, days_remaining` | Computed response |
 
-### bank.py
-- `BankConnectionCreate`: bank_name, account_name, account_type
-- `BankConnectionResponse`: Full connection data
-- `PendingTransactionResponse`: With nested optional `CategoryResponse`
-- `PendingTransactionImport`: category_id for import action
-- `BankBalanceResponse`: Summary for balance display
+### `bank.py` - Open Banking (5 classes)
+| Class | Fields | Purpose |
+|-------|--------|---------|
+| `BankConnectionCreate` | `bank_name, account_name, account_type` | Connect bank |
+| `BankConnectionResponse` | `+ id, balance, last_synced?, is_active, created_at` | Connection details |
+| `PendingTransactionResponse` | Full fields + `suggested_category?: CategoryResponse` | Pending import |
+| `PendingTransactionImport` | `category_id: int` | Import action |
+| `BankBalanceResponse` | `bank_connection_id, bank_name, account_name, account_type, balance` | Balance summary |
 
-## ORM Mode
+## Computed Fields
 
-All Response schemas use `from_attributes = True` to enable automatic conversion from SQLAlchemy models:
+| Schema | Field | Calculation |
+|--------|-------|-------------|
+| `BudgetStatus` | `spent` | Sum of expenses for category/month |
+| `BudgetStatus` | `remaining` | `budgeted - spent` |
+| `BudgetStatus` | `percentage_used` | `(spent / budgeted) * 100` |
+| `GoalResponse` | `progress_percentage` | `(current_amount / target_amount) * 100` |
+| `GoalResponse` | `days_remaining` | `(deadline - today).days` |
 
+## Nested Relationships
+
+These response schemas include full nested objects:
+- `TransactionResponse.category` → `CategoryResponse`
+- `BudgetResponse.category` → `CategoryResponse`
+- `RecurringResponse.category` → `CategoryResponse`
+- `PendingTransactionResponse.suggested_category` → `CategoryResponse | None`
+
+## ORM Mode Configuration
+
+All Response schemas use:
 ```python
 class Config:
-    from_attributes = True
+    from_attributes = True  # Enables SQLAlchemy → Pydantic conversion
 ```
 
-This allows returning ORM objects directly from endpoints:
+## Validation Notes
 
-```python
-@router.get("/items/{id}", response_model=ItemResponse)
-def get_item(id: int, db: Session = Depends(get_db)):
-    return db.query(Item).get(id)  # Automatically serialized
-```
+- No explicit PIN length validation (handled in frontend)
+- Amount fields accept any float (no minimum/maximum)
+- Type fields use string literals ("income"/"expense") not Python enums
+- Month format "YYYY-MM" not validated at schema level

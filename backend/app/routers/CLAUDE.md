@@ -1,105 +1,153 @@
 # Routers - CLAUDE.md
 
-## Overview
+> **Location:** `backend/app/routers/`
+> **Parent:** [`backend/app/`](../CLAUDE.md)
+> **Siblings:** [`models/`](../models/CLAUDE.md), [`schemas/`](../schemas/CLAUDE.md), [`services/`](../services/CLAUDE.md), [`utils/`](../utils/CLAUDE.md)
+
+## Purpose
 
 FastAPI routers defining all API endpoints. Each router handles a specific domain and is registered in `main.py` with the `/api` prefix.
 
-## Router Files
+## Endpoint Summary (41 total)
 
-### auth.py - `/api/auth`
-PIN-based authentication endpoints.
+| Router | File | Prefix | Endpoints |
+|--------|------|--------|-----------|
+| Auth | `auth.py` | `/api/auth` | 4 |
+| Transactions | `transactions.py` | `/api/transactions` | 4 |
+| Categories | `categories.py` | `/api/categories` | 4 |
+| Budgets | `budgets.py` | `/api/budgets` | 4 |
+| Recurring | `recurring.py` | `/api/recurring` | 5 |
+| Goals | `goals.py` | `/api/goals` | 5 |
+| Reports | `reports.py` | `/api/reports` | 3 |
+| Import/Export | `import_export.py` | `/api/import` | 2 |
+| Banking | `banking.py` | `/api/banking` | 10 |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/status` | Check if PIN is set up, return currency |
-| POST | `/setup` | Initial PIN setup, returns JWT token |
-| POST | `/login` | Authenticate with PIN, returns JWT token |
-| POST | `/change-pin` | Change existing PIN |
+---
 
-### transactions.py - `/api/transactions`
-Transaction CRUD operations.
+## auth.py - Authentication
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | List transactions (filters: start_date, end_date, category_id, type) |
-| POST | `/` | Create new transaction |
-| PUT | `/{id}` | Update transaction |
-| DELETE | `/{id}` | Delete transaction |
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/status` | `get_status` | - | `UserSettingsResponse` | 200 |
+| POST | `/setup` | `setup_pin` | `PinSetup` | `Token` | 201 |
+| POST | `/login` | `login` | `PinLogin` | `Token` | 200 |
+| POST | `/change-pin` | `change_pin` | `PinChange` | `{message}` | 200 |
 
-### categories.py - `/api/categories`
-Category management with default protection.
+**Logic:** Hash PIN with bcrypt, generate JWT tokens, verify PIN on login/change.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | List all categories |
-| POST | `/` | Create custom category |
-| PUT | `/{id}` | Update category |
-| DELETE | `/{id}` | Delete (fails for default categories) |
+---
 
-### budgets.py - `/api/budgets`
-Monthly budget tracking.
+## transactions.py - Transaction CRUD
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Get budgets for month (query: month=YYYY-MM) |
-| POST | `/` | Create/update budget (upsert) |
-| GET | `/status` | Get spending status with progress |
-| DELETE | `/{id}` | Delete budget |
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/` | `list_transactions` | Query params | `list[TransactionResponse]` | 200 |
+| POST | `/` | `create_transaction` | `TransactionCreate` | `TransactionResponse` | 201 |
+| PUT | `/{id}` | `update_transaction` | `TransactionUpdate` | `TransactionResponse` | 200 |
+| DELETE | `/{id}` | `delete_transaction` | - | - | 204 |
 
-### recurring.py - `/api/recurring`
-Recurring transaction management.
+**Query Parameters:** `start_date`, `end_date`, `category_id`, `type`
+**Logic:** Filter by date range/category/type, order by date DESC.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | List all recurring transactions |
-| POST | `/` | Create recurring transaction |
-| PUT | `/{id}` | Update recurring transaction |
-| DELETE | `/{id}` | Delete recurring transaction |
-| POST | `/process` | Process all due recurring transactions |
+---
 
-### goals.py - `/api/goals`
-Savings goals with contributions.
+## categories.py - Category Management
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | List goals with progress metrics |
-| POST | `/` | Create savings goal |
-| PUT | `/{id}` | Update goal |
-| POST | `/{id}/contribute` | Add contribution to goal |
-| DELETE | `/{id}` | Delete goal |
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/` | `list_categories` | - | `list[CategoryResponse]` | 200 |
+| POST | `/` | `create_category` | `CategoryCreate` | `CategoryResponse` | 201 |
+| PUT | `/{id}` | `update_category` | `CategoryUpdate` | `CategoryResponse` | 200 |
+| DELETE | `/{id}` | `delete_category` | - | - | 204 |
 
-### reports.py - `/api/reports`
-Financial analytics and summaries.
+**Protection:** Default categories (`is_default=True`) cannot be deleted (400 error).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/monthly-summary` | Income, expenses, net for month |
-| GET | `/category-breakdown` | Spending per category for month |
-| GET | `/trends` | Historical income/expense trends (1-24 months) |
+---
 
-### import_export.py - `/api/import`
-CSV import with validation.
+## budgets.py - Monthly Budgets
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/csv` | Upload CSV, returns preview with validation |
-| POST | `/confirm` | Confirm and import validated rows |
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/` | `list_budgets` | `?month=YYYY-MM` | `list[BudgetResponse]` | 200 |
+| POST | `/` | `create_or_update_budget` | `BudgetCreate` | `BudgetResponse` | 201 |
+| GET | `/status` | `get_budget_status` | `?month=YYYY-MM` | `list[BudgetStatus]` | 200 |
+| DELETE | `/{id}` | `delete_budget` | - | - | 204 |
 
-### banking.py - `/api/banking`
-Open Banking integration (mock).
+**Upsert Logic:** Create updates existing budget if category+month combination exists.
+**Status Calculation:** Aggregates expenses via `func.sum()`, computes remaining/percentage.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/banks` | List available mock banks |
-| GET | `/connections` | List active bank connections |
-| POST | `/connections` | Connect new bank account |
-| DELETE | `/connections/{id}` | Disconnect bank |
-| POST | `/connections/{id}/sync` | Sync transactions from bank |
-| GET | `/pending` | List pending transactions for review |
-| POST | `/pending/{id}/import` | Import single pending transaction |
-| POST | `/pending/{id}/dismiss` | Dismiss pending transaction |
-| POST | `/pending/import-all` | Bulk import all pending |
-| GET | `/balances` | Get all account balances |
+---
+
+## recurring.py - Recurring Transactions
+
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/` | `list_recurring` | - | `list[RecurringResponse]` | 200 |
+| POST | `/` | `create_recurring` | `RecurringCreate` | `RecurringResponse` | 201 |
+| PUT | `/{id}` | `update_recurring` | `RecurringUpdate` | `RecurringResponse` | 200 |
+| DELETE | `/{id}` | `delete_recurring` | - | - | 204 |
+| POST | `/process` | `process_recurring` | - | `{processed: int}` | 200 |
+
+**Process Logic:** Creates Transaction records for due items, calculates next_run_date based on frequency (daily +1 day, weekly +7 days, monthly +1 month).
+
+---
+
+## goals.py - Savings Goals
+
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/` | `list_goals` | - | `list[GoalResponse]` | 200 |
+| POST | `/` | `create_goal` | `GoalCreate` | `GoalResponse` | 201 |
+| PUT | `/{id}` | `update_goal` | `GoalUpdate` | `GoalResponse` | 200 |
+| POST | `/{id}/contribute` | `contribute_to_goal` | `GoalContribute` | `GoalResponse` | 200 |
+| DELETE | `/{id}` | `delete_goal` | - | - | 204 |
+
+**Computed Fields:** `progress_percentage` and `days_remaining` calculated in helper function.
+
+---
+
+## reports.py - Analytics
+
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/monthly-summary` | `monthly_summary` | `?month=YYYY-MM` | `{month, income, expenses, net}` | 200 |
+| GET | `/category-breakdown` | `category_breakdown` | `?month=YYYY-MM` | `list[{category_id, name, type, total}]` | 200 |
+| GET | `/trends` | `trends` | `?months=1-24` | `list[MonthlySummary]` | 200 |
+
+**Aggregations:** Uses `func.sum()` and `group_by()` for analytics.
+
+---
+
+## import_export.py - CSV Import
+
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| POST | `/csv` | `upload_csv` | `UploadFile` | `{rows, errors}` | 200 |
+| POST | `/confirm` | `confirm_import` | `{rows}` | `{created, errors}` | 200 |
+
+**CSV Format:** Required columns: `date`, `amount`, `type`, `category`. Optional: `description`.
+**Validation:** Date format, positive amounts, valid type, category existence.
+
+---
+
+## banking.py - Open Banking (10 endpoints)
+
+| Method | Path | Function | Request | Response | Status |
+|--------|------|----------|---------|----------|--------|
+| GET | `/banks` | `list_available_banks` | - | `list[BankInfo]` | 200 |
+| GET | `/connections` | `list_connections` | - | `list[BankConnectionResponse]` | 200 |
+| POST | `/connections` | `create_connection` | `BankConnectionCreate` | `BankConnectionResponse` | 201 |
+| DELETE | `/connections/{id}` | `delete_connection` | - | - | 204 |
+| POST | `/connections/{id}/sync` | `sync_connection` | - | `{synced, balance}` | 200 |
+| GET | `/pending` | `list_pending` | - | `list[PendingTransactionResponse]` | 200 |
+| POST | `/pending/{id}/import` | `import_transaction` | `PendingTransactionImport` | `{message, transaction_id}` | 200 |
+| POST | `/pending/{id}/dismiss` | `dismiss_transaction` | - | - | 204 |
+| POST | `/pending/import-all` | `import_all_pending` | - | `{imported}` | 200 |
+| GET | `/balances` | `get_balances` | - | `list[BankBalanceResponse]` | 200 |
+
+**Sync Logic:** Generates mock transactions, checks external_id for deduplication, auto-suggests categories.
+
+---
 
 ## Common Patterns
 
@@ -110,28 +158,14 @@ def get_items(db: Session = Depends(get_db)):
     return db.query(Item).all()
 ```
 
-### Response Models
+### Partial Updates
 ```python
-@router.get("/items/{id}", response_model=ItemResponse)
-def get_item(id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return item
+for key, value in data.model_dump(exclude_unset=True).items():
+    setattr(item, key, value)
 ```
 
-### Query Parameters
+### Error Handling
 ```python
-@router.get("/items")
-def get_items(
-    start_date: date | None = None,
-    category_id: int | None = None,
-    db: Session = Depends(get_db)
-):
-    query = db.query(Item)
-    if start_date:
-        query = query.filter(Item.date >= start_date)
-    if category_id:
-        query = query.filter(Item.category_id == category_id)
-    return query.all()
+if not item:
+    raise HTTPException(status_code=404, detail="Item not found")
 ```

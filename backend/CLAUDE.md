@@ -1,40 +1,58 @@
 # Backend - CLAUDE.md
 
-## Overview
+> **Location:** `backend/`
+> **Parent:** [Project Root](../CLAUDE.md)
+> **Children:** [`app/`](app/CLAUDE.md)
+> **Siblings:** [`frontend/`](../frontend/CLAUDE.md)
+
+## Purpose
 
 FastAPI backend for the Budget App. Provides REST API endpoints for personal finance management including transactions, budgets, recurring transactions, savings goals, reports, and Open Banking integration.
 
-## Tech Stack
-
-- **Framework**: FastAPI (async Python web framework)
-- **ORM**: SQLAlchemy with SQLite database
-- **Validation**: Pydantic schemas
-- **Authentication**: JWT tokens with bcrypt password hashing
-- **Server**: Uvicorn ASGI server
+---
 
 ## Directory Structure
 
 ```
 backend/
-├── app/
-│   ├── main.py          # FastAPI app entry point
-│   ├── config.py        # Settings and configuration
-│   ├── database.py      # SQLAlchemy engine and session
-│   ├── models/          # SQLAlchemy ORM models
-│   ├── schemas/         # Pydantic request/response schemas
-│   ├── routers/         # API endpoint handlers
-│   ├── services/        # Business logic services
-│   └── utils/           # Utility functions
-├── requirements.txt     # Python dependencies
-├── venv/                # Virtual environment
-└── budget.db            # SQLite database (auto-created)
+├── app/                     # Main application package
+│   ├── main.py             # FastAPI entry point
+│   ├── config.py           # Settings configuration
+│   ├── database.py         # SQLAlchemy setup
+│   ├── models/             # ORM models (8 models)
+│   ├── schemas/            # Pydantic schemas (28 classes)
+│   ├── routers/            # API endpoints (41 endpoints)
+│   ├── services/           # Business logic
+│   └── utils/              # Security utilities
+├── requirements.txt        # Python dependencies
+├── venv/                   # Virtual environment
+└── budget.db               # SQLite database (auto-created)
 ```
 
-## Running the Backend
+---
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Framework | FastAPI |
+| ORM | SQLAlchemy |
+| Database | SQLite |
+| Validation | Pydantic |
+| Auth | JWT + bcrypt |
+| Server | Uvicorn |
+
+---
+
+## Quick Start
 
 ```bash
+# Navigate to backend
+cd backend
+
 # Activate virtual environment
-source venv/bin/activate
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
 
 # Install dependencies
 pip install -r requirements.txt
@@ -43,28 +61,136 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-## API Documentation
+---
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- Health check: http://localhost:8000/api/health
+## API Endpoints
 
-## Key Features
+**Base URL:** `http://localhost:8000/api`
 
-- PIN-based authentication with JWT tokens
-- 9 API routers covering all financial operations
-- 8 database models with relationships
-- Auto-seeding of 15 default categories on startup
-- Mock Open Banking service for demonstration
-- CSV import with preview and validation
+| Category | Prefix | Endpoints | Description |
+|----------|--------|-----------|-------------|
+| Auth | `/auth` | 4 | PIN setup, login, change |
+| Transactions | `/transactions` | 4 | Income/expense CRUD |
+| Categories | `/categories` | 4 | Category management |
+| Budgets | `/budgets` | 4 | Monthly budget tracking |
+| Recurring | `/recurring` | 5 | Scheduled transactions |
+| Goals | `/goals` | 5 | Savings goal tracking |
+| Reports | `/reports` | 3 | Financial analytics |
+| Import | `/import` | 2 | CSV import |
+| Banking | `/banking` | 10 | Open Banking (mock) |
 
-## Environment Variables
+**Total:** 41 endpoints
 
-Create `.env` file to override defaults:
+---
+
+## Documentation
+
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
+- **Health Check:** http://localhost:8000/api/health
+
+---
+
+## Database
+
+**Location:** `backend/budget.db` (auto-created on first run)
+
+### Tables (8)
+
+| Table | Model | Purpose |
+|-------|-------|---------|
+| `user_settings` | UserSettings | PIN and preferences |
+| `categories` | Category | Transaction categories |
+| `transactions` | Transaction | Income/expenses |
+| `budgets` | Budget | Monthly limits |
+| `recurring_transactions` | RecurringTransaction | Scheduled items |
+| `goals` | Goal | Savings targets |
+| `bank_connections` | BankConnection | Connected accounts |
+| `pending_transactions` | PendingTransaction | Awaiting import |
+
+---
+
+## Configuration
+
+### Environment Variables (.env)
 
 ```env
-SECRET_KEY=your-secret-key
+SECRET_KEY=your-secret-key-here
 DATABASE_URL=sqlite:///./budget.db
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 DEFAULT_CURRENCY=USD
 ```
+
+### Defaults
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `app_name` | "Budget App" | Application name |
+| `database_url` | `sqlite:///./budget.db` | Database connection |
+| `secret_key` | `"change-this-in-production"` | JWT signing key |
+| `algorithm` | `"HS256"` | JWT algorithm |
+| `access_token_expire_minutes` | `10080` | Token lifetime (7 days) |
+| `default_currency` | `"USD"` | Default currency |
+
+---
+
+## Key Features
+
+### Authentication
+- PIN-based single-user auth
+- Bcrypt password hashing
+- JWT tokens (7-day expiry)
+
+### Categories
+- 15 default categories (10 expense, 5 income)
+- Protected from deletion
+- Custom categories supported
+
+### Open Banking (Mock)
+- 4 mock banks (Chase, BofA, Wells Fargo, Capital One)
+- 40 mock merchants with realistic amounts
+- Auto-categorization by merchant name
+- Transaction deduplication via external_id
+
+### Reports
+- Monthly summary (income/expenses/net)
+- Category breakdown
+- 6-month trend analysis
+
+---
+
+## Dependencies
+
+```
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pydantic-settings
+python-multipart
+passlib[bcrypt]
+bcrypt<5.0.0
+python-jose[cryptography]
+python-dateutil
+```
+
+---
+
+## Security Notes
+
+1. **Change SECRET_KEY** in production
+2. **CORS** configured for localhost:5173 only
+3. **No rate limiting** implemented
+4. **JWT tokens** not verified on endpoints (development mode)
+5. **Single-user** design (no multi-tenancy)
+
+---
+
+## Related Documentation
+
+- [`app/`](app/CLAUDE.md) - Core application module
+- [`app/models/`](app/models/CLAUDE.md) - Database models
+- [`app/schemas/`](app/schemas/CLAUDE.md) - Request/response schemas
+- [`app/routers/`](app/routers/CLAUDE.md) - API endpoints
+- [`app/services/`](app/services/CLAUDE.md) - Business logic
+- [`app/utils/`](app/utils/CLAUDE.md) - Security utilities

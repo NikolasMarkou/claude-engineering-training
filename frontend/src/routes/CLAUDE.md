@@ -1,137 +1,179 @@
 # Routes - CLAUDE.md
 
-## Overview
+> **Location:** `frontend/src/routes/`
+> **Parent:** [`frontend/src/`](../CLAUDE.md)
+> **Siblings:** None at this level (routes is primary content)
 
-SvelteKit file-based routing. Each directory or `+page.svelte` file defines a route. The `+layout.svelte` provides shared UI across all pages.
+## Purpose
 
-## Route Structure
+SvelteKit file-based routing. Each directory or `+page.svelte` file defines a route. The `+layout.svelte` provides shared UI (sidebar navigation) across all pages.
 
+---
+
+## Route Map (10 pages)
+
+| Path | File | Purpose |
+|------|------|---------|
+| `/` | `+page.svelte` | Dashboard - financial overview |
+| `/login` | `login/+page.svelte` | PIN setup and authentication |
+| `/transactions` | `transactions/+page.svelte` | Transaction CRUD with filtering |
+| `/budgets` | `budgets/+page.svelte` | Monthly budget management |
+| `/recurring` | `recurring/+page.svelte` | Recurring transaction setup |
+| `/goals` | `goals/+page.svelte` | Savings goal tracking |
+| `/banking` | `banking/+page.svelte` | Open Banking integration |
+| `/reports` | `reports/+page.svelte` | Charts and analytics |
+| `/settings` | `settings/+page.svelte` | PIN change, categories, CSV import |
+| - | `+layout.svelte` | Root layout with sidebar |
+
+---
+
+## +layout.svelte (Root Layout)
+
+**Purpose:** Shared navigation wrapper for all pages
+
+**Features:**
+- Sidebar navigation (220px fixed, dark blue #2c3e50)
+- Auth state subscription and route protection
+- Redirects to `/login` if not authenticated
+- Logout button
+
+**$effect Block:**
+```typescript
+$effect(() => {
+  const unsubscribe = auth.subscribe((state) => {
+    if (!state.loading && !state.isAuthenticated && !$page.url.pathname.startsWith('/login')) {
+      goto('/login');
+    }
+  });
+  return unsubscribe;
+});
 ```
-routes/
-├── +layout.svelte       # Root layout (sidebar, auth guard)
-├── +page.svelte         # Dashboard (/)
-├── login/
-│   └── +page.svelte     # Login/Setup (/login)
-├── transactions/
-│   └── +page.svelte     # Transactions (/transactions)
-├── budgets/
-│   └── +page.svelte     # Budgets (/budgets)
-├── recurring/
-│   └── +page.svelte     # Recurring (/recurring)
-├── goals/
-│   └── +page.svelte     # Goals (/goals)
-├── banking/
-│   └── +page.svelte     # Banking (/banking)
-├── reports/
-│   └── +page.svelte     # Reports (/reports)
-└── settings/
-    └── +page.svelte     # Settings (/settings)
-```
 
-## Pages
+**Navigation Items:**
+Dashboard, Transactions, Budgets, Recurring, Goals, Banking, Reports, Settings
 
-### +layout.svelte (Root Layout)
-- **Purpose**: Shared UI wrapper for all pages
-- **Features**:
-  - Sidebar navigation (220px fixed width)
-  - Auth state subscription and route protection
-  - Redirects to `/login` if not authenticated
-  - Logout button
-- **Styling**: Dark blue sidebar (#2c3e50), light gray content area
+---
 
-### +page.svelte (Dashboard)
-- **Route**: `/`
-- **Purpose**: Financial overview and quick stats
-- **Features**:
-  - Monthly summary (income, expenses, net)
-  - Budget status cards with progress bars
-  - Savings goals progress
-  - Parallel data loading with `Promise.all()`
+## +page.svelte (Dashboard)
 
-### login/+page.svelte
-- **Route**: `/login`
-- **Purpose**: PIN authentication
-- **Features**:
-  - Detects setup vs login state
-  - PIN creation with confirmation (min 4 chars)
-  - Redirects to dashboard on success
-  - Error message display
+**State:** `summary`, `budgetStatus`, `goals`, `loading`
 
-### transactions/+page.svelte
-- **Route**: `/transactions`
-- **Purpose**: Transaction CRUD
-- **Features**:
-  - List all transactions with category badges
-  - Filter by type and category
-  - Modal form for add/edit
-  - Delete confirmation
-  - Color-coded amounts (green/red)
+**API Calls:** `getMonthlySummary`, `getBudgetStatus`, `getGoals` (parallel via Promise.all)
 
-### budgets/+page.svelte
-- **Route**: `/budgets`
-- **Purpose**: Monthly budget management
-- **Features**:
-  - Month selector
-  - Budget status with progress bars
-  - Visual warnings (orange 75%, red 100%+)
-  - Add/delete budgets via modal
+**Sections:**
+- Summary cards (income, expenses, net)
+- Budget status with progress bars
+- Savings goals progress
 
-### recurring/+page.svelte
-- **Route**: `/recurring`
-- **Purpose**: Recurring transaction setup
-- **Features**:
-  - List recurring transactions
-  - Frequency options (daily/weekly/monthly)
-  - Active/inactive toggle
-  - "Process Due" button
-  - Next run date display
+---
 
-### goals/+page.svelte
-- **Route**: `/goals`
-- **Purpose**: Savings goal tracking
-- **Features**:
-  - Grid of goal cards
-  - Progress percentage and days remaining
-  - Contribution modal
-  - Create/edit/delete goals
+## login/+page.svelte
 
-### banking/+page.svelte
-- **Route**: `/banking`
-- **Purpose**: Open Banking integration
-- **Features**:
-  - Connected accounts with balances
-  - Add bank connection modal
-  - Sync button per account
-  - Pending transactions review
-  - Import/dismiss actions
-  - Bulk import all
+**State:** `pin`, `confirmPin`, `error`, `isSetup`, `loading`
 
-### reports/+page.svelte
-- **Route**: `/reports`
-- **Purpose**: Analytics and visualizations
-- **Features**:
-  - 6-month income vs expenses bar chart
-  - Category breakdown doughnut chart
-  - Monthly summary table
-  - Month selector for breakdown
+**Modes:**
+- **Setup mode:** New PIN creation with confirmation
+- **Login mode:** PIN authentication
 
-### settings/+page.svelte
-- **Route**: `/settings`
-- **Purpose**: Configuration and import
-- **Features**:
-  - Change PIN form
-  - Create custom categories
-  - Category list (default locked)
-  - CSV import with preview
+**Validation:** Minimum 4 characters, confirmation match
+
+---
+
+## transactions/+page.svelte
+
+**State:** `transactions`, `showForm`, `editingId`, `formData`, `filterType`, `filterCategory`
+
+**Features:**
+- Filter by type and category
+- Modal add/edit form
+- Delete with confirmation
+- Color-coded amounts (green income, red expense)
+
+**$effect:** Reloads on filter change
+
+---
+
+## budgets/+page.svelte
+
+**State:** `budgets`, `budgetStatus`, `showForm`, `currentMonth`, `formData`
+
+**Features:**
+- Month selector
+- Progress bars (green < 75%, orange 75-100%, red > 100%)
+- Spent/budgeted/remaining display
+
+**$effect:** Reloads on month change
+
+---
+
+## recurring/+page.svelte
+
+**State:** `recurring`, `showForm`, `formData`
+
+**Features:**
+- Frequency options (daily/weekly/monthly)
+- Active/inactive toggle
+- "Process Due" button for manual processing
+- Next run date display
+
+---
+
+## goals/+page.svelte
+
+**State:** `goals`, `showForm`, `showContribute`, `formData`, `contributeAmount`
+
+**Features:**
+- Grid of goal cards
+- Progress percentage and days remaining
+- Separate contribution modal
+
+---
+
+## banking/+page.svelte
+
+**State:** `connections`, `pendingTransactions`, `availableBanks`, `syncing`, `showAddBank`, `selectedBank`, `selectedAccount`
+
+**Features:**
+- Connect bank accounts
+- Sync transactions
+- Review pending with category selection
+- Import/dismiss individual or bulk
+
+**$effect:** Updates account options when bank selected
+
+---
+
+## reports/+page.svelte
+
+**State:** `trends`, `breakdown`, `currentMonth`, `trendChart`, `breakdownChart`, `trendCanvas`, `breakdownCanvas`
+
+**Chart.js Integration:**
+- Bar chart: 6-month income vs expenses
+- Doughnut chart: Category expense breakdown
+- Charts destroyed and recreated on data change
+
+**$effect:** Reloads on month change
+
+---
+
+## settings/+page.svelte
+
+**State:** `currentPin`, `newPin`, `confirmPin`, `pinError`, `pinSuccess`, `newCategory`, `categoryError`, `csvFile`, `csvPreview`, `importError`, `importSuccess`
+
+**Sections:**
+1. Change PIN form
+2. Custom categories with color picker
+3. Category list (default locked, custom deletable)
+4. CSV import with preview
+
+---
 
 ## Common Patterns
 
-### Page Data Loading
+### Data Loading
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api } from '$lib/api/client';
-
   let data = $state([]);
   let loading = $state(true);
 
@@ -144,50 +186,34 @@ routes/
 
 ### Modal Forms
 ```svelte
-<script lang="ts">
-  let showModal = $state(false);
-  let formData = $state({ name: '', amount: 0 });
-
-  async function handleSubmit() {
-    await api.createItem(formData);
-    showModal = false;
-    await loadData();
-  }
-</script>
-
 {#if showModal}
   <div class="modal-overlay" onclick={() => showModal = false}>
     <div class="modal" onclick={(e) => e.stopPropagation()}>
-      <form onsubmit={handleSubmit}>
-        <!-- form fields -->
-      </form>
+      <!-- form content -->
     </div>
   </div>
 {/if}
 ```
 
-### Filtering with $effect
+### Reactive Filtering
 ```svelte
-<script lang="ts">
-  let filterType = $state('all');
-  let filteredData = $state([]);
-
-  $effect(() => {
-    if (filterType === 'all') {
-      filteredData = data;
-    } else {
-      filteredData = data.filter(item => item.type === filterType);
-    }
-  });
-</script>
+$effect(() => {
+  if (filterType === 'all') {
+    filteredData = data;
+  } else {
+    filteredData = data.filter(item => item.type === filterType);
+  }
+});
 ```
+
+---
 
 ## Styling Conventions
 
-- Component-scoped `<style>` blocks
-- CSS variables for colors
-- Flexbox/Grid layouts
-- Card-based components
-- Modal overlays with semi-transparent background
-- Progress bars with percentage width
-- Color-coded status (green/orange/red)
+| Element | Style |
+|---------|-------|
+| Cards | White background, 8px radius, subtle shadow |
+| Progress bars | 8-10px height, colored fill |
+| Modals | Fixed overlay, centered, z-index 100 |
+| Amounts | Green (#2ecc71) income, red (#e74c3c) expense |
+| Buttons | Primary blue (#3498db), secondary gray, danger red |

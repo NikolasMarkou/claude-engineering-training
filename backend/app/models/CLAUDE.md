@@ -1,86 +1,153 @@
 # Models - CLAUDE.md
 
-## Overview
+> **Location:** `backend/app/models/`
+> **Parent:** [`backend/app/`](../CLAUDE.md)
+> **Siblings:** [`schemas/`](../schemas/CLAUDE.md), [`routers/`](../routers/CLAUDE.md), [`services/`](../services/CLAUDE.md), [`utils/`](../utils/CLAUDE.md)
 
-SQLAlchemy ORM models defining the database schema. All models inherit from `Base` (declarative base) and are automatically created as tables on application startup.
+## Purpose
 
-## Models
+SQLAlchemy ORM models defining the database schema for the Budget App. All models inherit from `Base` (declarative base from `database.py`) and are automatically created as tables on application startup.
 
-### user.py - UserSettings
-Single-user application settings and authentication.
-- `pin_hash`: Bcrypt-hashed PIN for authentication
-- `currency`: User's preferred currency (default: USD)
-- `created_at`: Account creation timestamp
+## Files
 
-### category.py - Category
-Transaction categories for organizing income/expenses.
-- `name`: Category name (e.g., "Food & Dining")
-- `type`: "income" or "expense"
-- `is_default`: Protected from deletion if true
-- `icon`: Font Awesome icon identifier
-- `color`: Hex color code for UI display
+| File | Model(s) | Table Name | Purpose |
+|------|----------|------------|---------|
+| `__init__.py` | - | - | Exports all models |
+| `user.py` | `UserSettings` | `user_settings` | Single-user authentication and preferences |
+| `category.py` | `Category` | `categories` | Transaction categorization |
+| `transaction.py` | `Transaction` | `transactions` | Income/expense records |
+| `budget.py` | `Budget` | `budgets` | Monthly spending limits |
+| `recurring.py` | `RecurringTransaction` | `recurring_transactions` | Automated scheduled transactions |
+| `goal.py` | `Goal` | `goals` | Savings targets with deadlines |
+| `bank.py` | `BankConnection`, `PendingTransaction` | `bank_connections`, `pending_transactions` | Open Banking integration |
 
-### transaction.py - Transaction
-Individual financial transactions.
-- `amount`: Transaction amount (float)
-- `type`: "income" or "expense"
-- `category_id`: Foreign key to Category
-- `description`: Optional notes
-- `date`: Transaction date
+## Model Details
 
-### budget.py - Budget
-Monthly spending limits per category.
-- `category_id`: Foreign key to Category
-- `amount`: Budget limit
-- `month`: Format "YYYY-MM" for easy querying
+### UserSettings (`user.py`)
+```python
+id: Integer (PK)
+pin_hash: String (NOT NULL)      # Bcrypt-hashed PIN
+currency: String (DEFAULT="USD") # Preferred currency
+created_at: DateTime (UTC)       # Account creation
+```
+**Relationships:** None (singleton root entity)
 
-### recurring.py - RecurringTransaction
-Automated recurring income/expenses.
-- `amount`, `type`, `category_id`, `description`: Transaction template
-- `frequency`: "daily", "weekly", or "monthly"
-- `next_run_date`: Next scheduled execution
-- `is_active`: Enable/disable toggle
+### Category (`category.py`)
+```python
+id: Integer (PK)
+name: String (NOT NULL)          # e.g., "Food & Dining"
+type: String (NOT NULL)          # "income" or "expense"
+is_default: Boolean (DEFAULT=False)  # Protected from deletion
+icon: String (nullable)          # Font Awesome icon name
+color: String (nullable)         # Hex color code
+created_at: DateTime (UTC)
+```
+**Relationships:** Referenced by Transaction, Budget, RecurringTransaction, PendingTransaction
 
-### goal.py - Goal
-Savings goals with progress tracking.
-- `name`: Goal name
-- `target_amount`: Savings target
-- `current_amount`: Progress (default 0.0)
-- `deadline`: Target completion date
+### Transaction (`transaction.py`)
+```python
+id: Integer (PK)
+amount: Float (NOT NULL)
+type: String (NOT NULL)          # "income" or "expense"
+category_id: Integer (FK → categories.id, NOT NULL)
+description: String (nullable)
+date: Date (NOT NULL)
+created_at: DateTime (UTC)
+```
+**Relationships:** `category` → Category (many-to-one)
 
-### bank.py - BankConnection & PendingTransaction
-Open Banking integration models.
+### Budget (`budget.py`)
+```python
+id: Integer (PK)
+category_id: Integer (FK → categories.id, NOT NULL)
+amount: Float (NOT NULL)         # Monthly limit
+month: String (NOT NULL)         # Format: "YYYY-MM"
+created_at: DateTime (UTC)
+```
+**Relationships:** `category` → Category (many-to-one)
 
-**BankConnection:**
-- `bank_name`, `account_name`, `account_type`
-- `balance`: Current account balance
-- `last_synced`: Last sync timestamp
-- `is_active`: Connection status
+### RecurringTransaction (`recurring.py`)
+```python
+id: Integer (PK)
+amount: Float (NOT NULL)
+type: String (NOT NULL)          # "income" or "expense"
+category_id: Integer (FK → categories.id, NOT NULL)
+description: String (nullable)
+frequency: String (NOT NULL)     # "daily", "weekly", "monthly"
+next_run_date: Date (NOT NULL)
+is_active: Boolean (DEFAULT=True)
+created_at: DateTime (UTC)
+```
+**Relationships:** `category` → Category (many-to-one)
 
-**PendingTransaction:**
-- `bank_connection_id`: Foreign key to BankConnection
-- `external_id`: Bank's transaction ID (for deduplication)
-- `merchant_name`, `amount`, `date`
-- `suggested_category_id`: Auto-suggested category
-- `status`: "pending", "imported", or "dismissed"
+### Goal (`goal.py`)
+```python
+id: Integer (PK)
+name: String (NOT NULL)
+target_amount: Float (NOT NULL)
+current_amount: Float (DEFAULT=0.0)
+deadline: Date (NOT NULL)
+created_at: DateTime (UTC)
+```
+**Relationships:** None (standalone entity)
 
-## Relationships
+### BankConnection (`bank.py`)
+```python
+id: Integer (PK)
+bank_name: String (NOT NULL)
+account_name: String (NOT NULL)
+account_type: String (NOT NULL)  # "checking", "savings", "credit"
+balance: Float (DEFAULT=0.0)
+last_synced: DateTime (nullable)
+is_active: Boolean (DEFAULT=True)
+created_at: DateTime (UTC)
+```
+**Relationships:** `pending_transactions` → PendingTransaction[] (one-to-many, cascade delete)
+
+### PendingTransaction (`bank.py`)
+```python
+id: Integer (PK)
+bank_connection_id: Integer (FK → bank_connections.id, NOT NULL)
+external_id: String (NOT NULL)   # Bank's transaction ID (deduplication)
+amount: Float (NOT NULL)
+merchant_name: String (NOT NULL)
+date: String (NOT NULL)          # "YYYY-MM-DD"
+suggested_category_id: Integer (FK → categories.id, nullable)
+status: String (DEFAULT="pending")  # "pending", "imported", "dismissed"
+created_at: DateTime (UTC)
+```
+**Relationships:** `bank_connection` → BankConnection, `suggested_category` → Category
+
+## Entity Relationship Diagram
 
 ```
-Category (1) ←── (M) Transaction
-Category (1) ←── (M) Budget
-Category (1) ←── (M) RecurringTransaction
-Category (1) ←── (M) PendingTransaction (suggested_category)
+UserSettings (singleton)
+
+Category (1) ←─────┬── (M) Transaction
+                   ├── (M) Budget
+                   ├── (M) RecurringTransaction
+                   └── (M) PendingTransaction (suggested)
+
+Goal (standalone)
+
 BankConnection (1) ←── (M) PendingTransaction (cascade delete)
 ```
 
-## Usage
+## Usage Pattern
 
 ```python
 from app.models import Category, Transaction, Budget
 from app.database import get_db
+from sqlalchemy.orm import Session
 
-# In a route handler
-def get_transactions(db: Session = Depends(get_db)):
-    return db.query(Transaction).all()
+def get_transactions(db: Session):
+    return db.query(Transaction).join(Category).all()
 ```
+
+## Key Design Decisions
+
+1. **Timezone-aware timestamps:** All `created_at` use `datetime.now(timezone.utc)`
+2. **Soft type enums:** Type fields stored as strings (not Python enums)
+3. **Month as string:** Budgets use "YYYY-MM" format for easy querying
+4. **Cascade delete:** Only PendingTransaction cascades from BankConnection
+5. **No updated_at:** Models lack update tracking (potential improvement)

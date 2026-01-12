@@ -1,98 +1,179 @@
 # Utils - CLAUDE.md
 
-## Overview
+> **Location:** `backend/app/utils/`
+> **Parent:** [`backend/app/`](../CLAUDE.md)
+> **Siblings:** [`models/`](../models/CLAUDE.md), [`schemas/`](../schemas/CLAUDE.md), [`routers/`](../routers/CLAUDE.md), [`services/`](../services/CLAUDE.md)
 
-Shared utility functions for security operations including password hashing and JWT token management.
+## Purpose
+
+Shared utility functions for security operations: password hashing and JWT token management.
+
+---
 
 ## security.py
 
-### Password Hashing
-
-Uses `passlib` with bcrypt algorithm for secure PIN storage.
+### Dependencies
 
 ```python
+from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
+from jose import jwt, JWTError
+from app.config import settings
+```
 
+### Password Context
+
+```python
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ```
 
-**Functions:**
+Uses bcrypt with automatic salt generation and timing-safe comparison.
 
-`hash_pin(pin: str) -> str`
-- Hashes plaintext PIN using bcrypt
-- Returns hash string for database storage
-- Automatically handles salt generation
+---
 
-`verify_pin(plain_pin: str, hashed_pin: str) -> bool`
-- Compares plaintext PIN against stored hash
-- Uses timing-safe comparison to prevent timing attacks
-- Returns True if match, False otherwise
+### Function: `hash_pin(pin: str) -> str`
+
+**Purpose:** Hash plaintext PIN for secure storage
+
+```python
+def hash_pin(pin: str) -> str:
+    return pwd_context.hash(pin)
+```
 
 **Usage:**
 ```python
-from app.utils.security import hash_pin, verify_pin
+from app.utils.security import hash_pin
 
-# Storing a PIN
-hashed = hash_pin("1234")
-# Store hashed in database
-
-# Verifying a PIN
-if verify_pin("1234", hashed):
-    print("PIN correct")
+hashed = hash_pin("1234")  # Store in UserSettings.pin_hash
+# Returns: "$2b$12$..." (bcrypt hash string)
 ```
 
-### JWT Token Management
+---
 
-Uses `python-jose` for JSON Web Token creation and verification.
+### Function: `verify_pin(plain_pin: str, hashed_pin: str) -> bool`
 
-**Configuration (from config.py):**
-- Algorithm: HS256
-- Expiration: 7 days (10080 minutes)
-- Secret Key: Configured via environment variable
+**Purpose:** Verify PIN against stored hash
 
-`create_access_token(data: dict) -> str`
-- Creates JWT with provided payload
-- Adds expiration timestamp automatically
-- Signs with configured secret key and algorithm
+```python
+def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
+    return pwd_context.verify(plain_pin, hashed_pin)
+```
 
-`verify_token(token: str) -> dict | None`
-- Decodes and validates JWT
-- Returns payload dict if valid
-- Returns None on any error (expired, invalid signature, malformed)
+**Features:**
+- Timing-safe comparison (prevents timing attacks)
+- Handles salt automatically
+
+**Usage:**
+```python
+from app.utils.security import verify_pin
+
+if verify_pin("1234", user.pin_hash):
+    # PIN correct - generate token
+```
+
+---
+
+### Function: `create_access_token(data: dict) -> str`
+
+**Purpose:** Create JWT access token with expiration
+
+```python
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.access_token_expire_minutes  # Default: 10080 (7 days)
+    )
+    to_encode.update({"exp": expire})
+    return jwt.encode(
+        to_encode,
+        settings.secret_key,      # Default: "change-this-in-production"
+        algorithm=settings.algorithm  # Default: "HS256"
+    )
+```
 
 **Token Payload:**
 ```python
 {
-    "sub": "user",     # Subject (user identifier)
-    "exp": 1234567890  # Expiration timestamp
+    "sub": "user",     # Subject identifier
+    "exp": 1234567890  # Expiration timestamp (auto-added)
 }
 ```
 
 **Usage:**
 ```python
-from app.utils.security import create_access_token, verify_token
+from app.utils.security import create_access_token
 
-# Creating a token
 token = create_access_token({"sub": "user"})
-
-# Verifying a token
-payload = verify_token(token)
-if payload:
-    print(f"Valid token for: {payload['sub']}")
-else:
-    print("Invalid or expired token")
+return {"access_token": token, "token_type": "bearer"}
 ```
 
-## Dependencies
+---
 
-Required packages in `requirements.txt`:
-- `passlib[bcrypt]` - Password hashing
-- `bcrypt<5.0.0` - Bcrypt implementation (pinned for compatibility)
-- `python-jose[cryptography]` - JWT handling
+### Function: `verify_token(token: str) -> dict | None`
 
-## Security Notes
+**Purpose:** Decode and validate JWT token
 
-1. **Secret Key**: Must be changed from default in production
-2. **Token Storage**: Frontend stores in localStorage (consider httpOnly cookies for production)
-3. **PIN Requirements**: Minimum 4 characters enforced at frontend
-4. **No Rate Limiting**: Consider adding for production brute-force protection
+```python
+def verify_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm]
+        )
+        return payload
+    except JWTError:
+        return None
+```
+
+**Returns:**
+- `dict` - Decoded payload if valid
+- `None` - If expired, invalid signature, or malformed
+
+**Error Handling:** Catches all `JWTError` variants:
+- `ExpiredSignatureError` - Token expired
+- `JWTClaimsError` - Invalid claims
+- `JWTError` - Malformed/invalid signature
+
+**Usage:**
+```python
+from app.utils.security import verify_token
+
+payload = verify_token(token_from_header)
+if payload:
+    user_id = payload.get("sub")  # "user"
+else:
+    # Return 401 Unauthorized
+```
+
+---
+
+## Configuration (from `config.py`)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `secret_key` | `"change-this-in-production"` | JWT signing key |
+| `algorithm` | `"HS256"` | JWT algorithm |
+| `access_token_expire_minutes` | `10080` | Token lifetime (7 days) |
+
+---
+
+## Security Considerations
+
+1. **Secret Key:** MUST be changed in production via environment variable
+2. **Token Lifetime:** 7 days is long; consider shorter for production
+3. **No Refresh Tokens:** Current implementation lacks token refresh
+4. **No Rate Limiting:** Brute-force protection not implemented
+5. **PIN Length:** Minimum length not enforced at backend (frontend only)
+6. **Token Storage:** Frontend uses localStorage (consider httpOnly cookies)
+
+---
+
+## Used By
+
+| Router | Functions Used |
+|--------|----------------|
+| `auth.py` | `hash_pin`, `verify_pin`, `create_access_token` |
+| *(future)* | `verify_token` for protected routes |
+
+**Note:** Currently, API endpoints do not verify JWT tokens. `verify_token` is available but not used as middleware.
