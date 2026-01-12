@@ -5,6 +5,13 @@ from app.models.budget import Budget
 from app.models.recurring import RecurringTransaction
 from app.models.goal import Goal
 from app.models.bank import BankConnection, PendingTransaction
+from app.models.currency import (
+    Currency,
+    SUPPORTED_CURRENCIES,
+    CURRENCY_SYMBOLS,
+    CURRENCY_NAMES,
+    CURRENCY_LOCALES,
+)
 
 __all__ = [
     "UserSettings",
@@ -15,4 +22,9 @@ __all__ = [
     "Goal",
     "BankConnection",
     "PendingTransaction",
+    "Currency",
+    "SUPPORTED_CURRENCIES",
+    "CURRENCY_SYMBOLS",
+    "CURRENCY_NAMES",
+    "CURRENCY_LOCALES",
 ]

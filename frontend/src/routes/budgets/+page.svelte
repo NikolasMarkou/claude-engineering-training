@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
 	import { categories } from '$lib/stores/categories';
+	import { currency } from '$lib/stores/currency';
 	import type { Budget, BudgetStatus } from '$lib/api/types';
 
 	let budgets: Budget[] = $state([]);
@@ -13,7 +14,7 @@
 	let formData = $state({ category_id: 0, amount: 0 });
 
 	onMount(async () => {
-		await categories.load();
+		await Promise.all([categories.load(), currency.load()]);
 		await loadBudgets();
 	});
 
@@ -56,7 +57,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+		return currency.format(amount);
 	}
 
 	$effect(() => {

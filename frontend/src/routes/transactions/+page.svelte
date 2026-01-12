@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
 	import { categories } from '$lib/stores/categories';
+	import { currency } from '$lib/stores/currency';
 	import type { Transaction, Category, TransactionCreate } from '$lib/api/types';
 
 	let transactions: Transaction[] = $state([]);
@@ -21,7 +22,7 @@
 	let filterCategory = $state(0);
 
 	onMount(async () => {
-		await Promise.all([loadTransactions(), categories.load()]);
+		await Promise.all([loadTransactions(), categories.load(), currency.load()]);
 	});
 
 	async function loadTransactions() {
@@ -88,10 +89,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
+		return currency.format(amount);
 	}
 
 	function getCategoryColor(category: Category): string {

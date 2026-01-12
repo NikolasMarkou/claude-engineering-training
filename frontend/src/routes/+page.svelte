@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
+	import { currency } from '$lib/stores/currency';
 	import type { MonthlySummary, BudgetStatus, Goal } from '$lib/api/types';
 
 	let summary: MonthlySummary | null = $state(null);
@@ -11,6 +12,7 @@
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	onMount(async () => {
+		currency.load();
 		try {
 			const [summaryData, budgetData, goalsData] = await Promise.all([
 				api.getMonthlySummary(currentMonth),
@@ -28,10 +30,7 @@
 	});
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
+		return currency.format(amount);
 	}
 </script>
 

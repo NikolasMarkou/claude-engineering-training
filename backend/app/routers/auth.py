@@ -3,8 +3,22 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import UserSettings
-from app.schemas.user import PinSetup, PinLogin, PinChange, Token, UserSettingsResponse
+from app.schemas.user import (
+    PinSetup,
+    PinLogin,
+    PinChange,
+    Token,
+    UserSettingsResponse,
+    CurrencyUpdate,
+    ExchangeRatesResponse,
+)
 from app.utils.security import hash_pin, verify_pin, create_access_token
+from app.services.exchange_rate_service import (
+    refresh_rates,
+    get_all_rates,
+    get_cache_info,
+    invalidate_cache,
+)
 
 router = APIRouter()
 
@@ -72,3 +86,46 @@ def change_pin(data: PinChange, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "PIN changed successfully"}
+
+
+@router.put("/currency")
+def update_currency(data: CurrencyUpdate, db: Session = Depends(get_db)):
+    """Update user's preferred currency."""
+    user = db.query(UserSettings).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not set up"
+        )
+
+    user.currency = data.currency
+    db.commit()
+
+    return {"message": "Currency updated", "currency": data.currency}
+
+
+@router.get("/exchange-rates", response_model=ExchangeRatesResponse)
+async def get_exchange_rates():
+    """Get current exchange rates."""
+    await refresh_rates()
+    cache_info = get_cache_info()
+
+    return ExchangeRatesResponse(
+        provider=cache_info["provider"],
+        rates=get_all_rates(),
+        cached_at=cache_info["cached_at"],
+    )
+
+
+@router.post("/exchange-rates/refresh")
+async def refresh_exchange_rates():
+    """Force refresh exchange rates from provider."""
+    invalidate_cache()
+    success = await refresh_rates()
+
+    cache_info = get_cache_info()
+    return {
+        "message": "Rates refreshed" if success else "Using cached/static rates",
+        "provider": cache_info["provider"],
+        "cached_at": cache_info["cached_at"],
+    }

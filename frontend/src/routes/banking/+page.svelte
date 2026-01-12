@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
 	import { categories } from '$lib/stores/categories';
+	import { currency } from '$lib/stores/currency';
 	import type { BankConnection, BankInfo, PendingTransaction } from '$lib/api/types';
 
 	let connections: BankConnection[] = $state([]);
@@ -15,7 +16,7 @@
 	let selectedAccount = $state('');
 
 	onMount(async () => {
-		await categories.load();
+		await Promise.all([categories.load(), currency.load()]);
 		await loadData();
 	});
 
@@ -126,7 +127,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+		return currency.format(amount);
 	}
 
 	function formatDate(dateStr: string | null): string {

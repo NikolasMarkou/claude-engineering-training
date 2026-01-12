@@ -86,6 +86,21 @@ export interface CategoryBreakdown {
 export interface AuthStatus {
 	currency: string;
 	is_setup: boolean;
+	available_currencies: string[];
+}
+
+export type SupportedCurrency = 'USD' | 'EUR' | 'GBP';
+
+export const CURRENCY_CONFIG: Record<SupportedCurrency, { locale: string; symbol: string; name: string }> = {
+	USD: { locale: 'en-US', symbol: '$', name: 'US Dollar' },
+	EUR: { locale: 'de-DE', symbol: '€', name: 'Euro' },
+	GBP: { locale: 'en-GB', symbol: '£', name: 'British Pound' }
+};
+
+export interface ExchangeRates {
+	provider: string;
+	rates: Record<string, number>;
+	cached_at: string | null;
 }
 
 export interface Token {

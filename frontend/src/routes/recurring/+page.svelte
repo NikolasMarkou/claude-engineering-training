@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
 	import { categories } from '$lib/stores/categories';
+	import { currency } from '$lib/stores/currency';
 	import type { RecurringTransaction } from '$lib/api/types';
 
 	let recurring: RecurringTransaction[] = $state([]);
@@ -13,12 +14,12 @@
 		type: 'expense' as 'income' | 'expense',
 		category_id: 0,
 		description: '',
-		frequency: 'monthly',
+		frequency: 'monthly' as 'daily' | 'weekly' | 'monthly',
 		next_run_date: new Date().toISOString().slice(0, 10)
 	});
 
 	onMount(async () => {
-		await categories.load();
+		await Promise.all([categories.load(), currency.load()]);
 		await loadRecurring();
 	});
 
@@ -37,7 +38,7 @@
 		try {
 			await api.createRecurring(formData);
 			showForm = false;
-			formData = { amount: 0, type: 'expense', category_id: 0, description: '', frequency: 'monthly', next_run_date: new Date().toISOString().slice(0, 10) };
+			formData = { amount: 0, type: 'expense' as 'income' | 'expense', category_id: 0, description: '', frequency: 'monthly' as 'daily' | 'weekly' | 'monthly', next_run_date: new Date().toISOString().slice(0, 10) };
 			await loadRecurring();
 		} catch (e) {
 			console.error('Failed to create recurring:', e);
@@ -75,7 +76,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+		return currency.format(amount);
 	}
 </script>
 

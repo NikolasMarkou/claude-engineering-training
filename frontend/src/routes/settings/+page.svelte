@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { api } from '$lib/api/client';
 	import { categories } from '$lib/stores/categories';
+	import { currency } from '$lib/stores/currency';
 	import { onMount } from 'svelte';
-	import type { Category } from '$lib/api/types';
+	import type { Category, SupportedCurrency, ExchangeRates } from '$lib/api/types';
+	import { CURRENCY_CONFIG } from '$lib/api/types';
+
+	// Currency state
+	let selectedCurrency = $state<SupportedCurrency>('USD');
+	let currencySuccess = $state('');
+	let currencyError = $state('');
+	let exchangeRates = $state<ExchangeRates | null>(null);
+	let refreshingRates = $state(false);
 
 	let currentPin = $state('');
 	let newPin = $state('');
@@ -18,9 +27,43 @@
 	let importError = $state('');
 	let importSuccess = $state('');
 
-	onMount(() => {
+	onMount(async () => {
 		categories.load();
+		await currency.load();
+		selectedCurrency = currency.getCurrent();
+		loadExchangeRates();
 	});
+
+	async function loadExchangeRates() {
+		try {
+			exchangeRates = await api.getExchangeRates();
+		} catch (e) {
+			console.error('Failed to load exchange rates:', e);
+		}
+	}
+
+	async function updateCurrency() {
+		currencyError = '';
+		currencySuccess = '';
+		try {
+			await currency.setCurrency(selectedCurrency);
+			currencySuccess = 'Currency preference saved';
+			setTimeout(() => (currencySuccess = ''), 3000);
+		} catch (e) {
+			currencyError = e instanceof Error ? e.message : 'Failed to update currency';
+		}
+	}
+
+	async function refreshRates() {
+		refreshingRates = true;
+		try {
+			await currency.refreshRates();
+			await loadExchangeRates();
+		} catch (e) {
+			console.error('Failed to refresh rates:', e);
+		}
+		refreshingRates = false;
+	}
 
 	async function changePin() {
 		pinError = '';
@@ -104,6 +147,45 @@
 
 <div class="settings-page">
 	<h1>Settings</h1>
+
+	<section class="settings-section">
+		<h2>Display Currency</h2>
+		<div class="currency-form">
+			<div class="form-group">
+				<label for="currency">Preferred Currency</label>
+				<select id="currency" bind:value={selectedCurrency} onchange={updateCurrency}>
+					{#each $currency.available as curr}
+						<option value={curr}>{CURRENCY_CONFIG[curr].symbol} {CURRENCY_CONFIG[curr].name} ({curr})</option>
+					{/each}
+				</select>
+			</div>
+			{#if currencyError}<p class="error">{currencyError}</p>{/if}
+			{#if currencySuccess}<p class="success">{currencySuccess}</p>{/if}
+		</div>
+
+		{#if exchangeRates}
+			<div class="exchange-rates">
+				<h3>Exchange Rates</h3>
+				<p class="help-text">
+					Provider: {exchangeRates.provider}
+					{#if exchangeRates.cached_at}
+						| Last updated: {new Date(exchangeRates.cached_at).toLocaleString()}
+					{/if}
+				</p>
+				<div class="rates-grid">
+					{#each Object.entries(exchangeRates.rates) as [pair, rate]}
+						<div class="rate-item">
+							<span class="pair">{pair.replace('_', ' → ')}</span>
+							<span class="rate">{rate.toFixed(4)}</span>
+						</div>
+					{/each}
+				</div>
+				<button class="btn-secondary" onclick={refreshRates} disabled={refreshingRates}>
+					{refreshingRates ? 'Refreshing...' : 'Refresh Rates'}
+				</button>
+			</div>
+		{/if}
+	</section>
 
 	<section class="settings-section">
 		<h2>Change PIN</h2>
@@ -225,4 +307,11 @@
 	.preview { margin-top: 1rem; padding: 1rem; background: #f9f9f9; border-radius: 4px; }
 	.preview h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 	.preview-actions { display: flex; gap: 1rem; margin-top: 1rem; }
+	.currency-form select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+	.exchange-rates { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+	.exchange-rates h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+	.rates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin: 1rem 0; }
+	.rate-item { display: flex; justify-content: space-between; padding: 0.5rem; background: #f9f9f9; border-radius: 4px; font-size: 0.9rem; }
+	.rate-item .pair { color: #666; }
+	.rate-item .rate { font-weight: 500; }
 </style>

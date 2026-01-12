@@ -13,7 +13,9 @@ import type {
 	BankInfo,
 	BankConnection,
 	PendingTransaction,
-	BankBalance
+	BankBalance,
+	ExchangeRates,
+	SupportedCurrency
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -103,6 +105,22 @@ class ApiClient {
 			method: 'POST',
 			body: JSON.stringify({ current_pin: currentPin, new_pin: newPin })
 		});
+	}
+
+	// Currency
+	async updateCurrency(currency: SupportedCurrency): Promise<{ message: string; currency: string }> {
+		return this.request('/auth/currency', {
+			method: 'PUT',
+			body: JSON.stringify({ currency })
+		});
+	}
+
+	async getExchangeRates(): Promise<ExchangeRates> {
+		return this.request('/auth/exchange-rates');
+	}
+
+	async refreshExchangeRates(): Promise<{ message: string; provider: string; cached_at: string | null }> {
+		return this.request('/auth/exchange-rates/refresh', { method: 'POST' });
 	}
 
 	// Categories

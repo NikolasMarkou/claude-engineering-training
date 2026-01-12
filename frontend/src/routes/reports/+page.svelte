@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
+	import { currency } from '$lib/stores/currency';
 	import type { MonthlySummary, CategoryBreakdown } from '$lib/api/types';
 	import { Chart, registerables } from 'chart.js';
 
@@ -17,6 +18,7 @@
 	let breakdownCanvas: HTMLCanvasElement;
 
 	onMount(async () => {
+		currency.load();
 		await loadData();
 	});
 
@@ -96,7 +98,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+		return currency.format(amount);
 	}
 
 	$effect(() => {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
+	import { currency } from '$lib/stores/currency';
 	import type { Goal } from '$lib/api/types';
 
 	let goals: Goal[] = $state([]);
@@ -11,7 +12,10 @@
 	let formData = $state({ name: '', target_amount: 0, deadline: '' });
 	let contributeAmount = $state(0);
 
-	onMount(loadGoals);
+	onMount(() => {
+		currency.load();
+		loadGoals();
+	});
 
 	async function loadGoals() {
 		loading = true;
@@ -58,7 +62,7 @@
 	}
 
 	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+		return currency.format(amount);
 	}
 </script>
 
